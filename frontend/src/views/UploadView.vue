@@ -5,6 +5,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { listPersons, uploadPhotos } from "../api/client"
 import type { Person, UploadPhotoPayload } from "../types"
 
+const MAX_SINGLE_FILE_SIZE = 4 * 1024 * 1024
+const MAX_BATCH_SIZE = 4 * 1024 * 1024
+
 type PendingPhoto = {
   id: string
   file: File
@@ -17,10 +20,41 @@ type PendingPhoto = {
 const persons = ref<Person[]>([])
 const pendingPhotos = ref<PendingPhoto[]>([])
 const uploading = ref(false)
+const uploadNotice = ref("")
 
 const defaultShotMonth = ref("")
 const defaultSelectedPersons = ref<number[]>([])
 const defaultTitle = ref("")
+
+function formatBytes(size: number) {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`
+}
+
+function getTotalFileSize(files: File[]) {
+  return files.reduce((total, file) => total + file.size, 0)
+}
+
+function validateUploadFiles(files: File[]) {
+  const oversizedFiles = files.filter((file) => file.size > MAX_SINGLE_FILE_SIZE)
+
+  if (oversizedFiles.length > 0) {
+    const names = oversizedFiles
+      .slice(0, 3)
+      .map((file) => `${file.name}（${formatBytes(file.size)}）`)
+      .join("、")
+    const suffix = oversizedFiles.length > 3 ? " 等文件" : ""
+    return `以下图片超过单张 ${formatBytes(MAX_SINGLE_FILE_SIZE)} 限制：${names}${suffix}。请先压缩后再上传。`
+  }
+
+  const totalSize = getTotalFileSize(files)
+  if (totalSize > MAX_BATCH_SIZE) {
+    return `当前批次总大小为 ${formatBytes(totalSize)}，已超过 ${formatBytes(MAX_BATCH_SIZE)} 限制。请减少张数或分批上传。`
+  }
+
+  return ""
+}
 
 async function getPhotoMonth(file: File) {
   try {
@@ -80,7 +114,29 @@ async function handleFilesChange(event: Event) {
   const imageFiles = files.filter((file) => file.type.startsWith("image/"))
 
   if (imageFiles.length === 0) {
+    uploadNotice.value = "请选择图片文件"
     alert("请选择图片文件")
+    target.value = ""
+    return
+  }
+
+  const validationMessage = validateUploadFiles(imageFiles)
+  if (validationMessage) {
+    uploadNotice.value = validationMessage
+    alert(validationMessage)
+    target.value = ""
+    return
+  }
+
+  const combinedFiles = [
+    ...pendingPhotos.value.map((item) => item.file),
+    ...imageFiles,
+  ]
+  const combinedValidationMessage = validateUploadFiles(combinedFiles)
+  if (combinedValidationMessage) {
+    uploadNotice.value = `加入当前待上传列表后会超限。${combinedValidationMessage}`
+    alert(uploadNotice.value)
+    target.value = ""
     return
   }
 
@@ -100,6 +156,9 @@ async function handleFilesChange(event: Event) {
   }
 
   pendingPhotos.value = [...pendingPhotos.value, ...newItems]
+  uploadNotice.value = `已选择 ${pendingPhotos.value.length} 张图片，总大小 ${formatBytes(
+    getTotalFileSize(pendingPhotos.value.map((item) => item.file)),
+  )}。`
   target.value = ""
 }
 
@@ -177,6 +236,7 @@ function removePendingPhoto(id: string) {
 function clearAllPending() {
   pendingPhotos.value.forEach((item) => revokePreviewUrl(item.previewUrl))
   pendingPhotos.value = []
+  uploadNotice.value = ""
 }
 
 async function handleBatchUpload() {
@@ -185,10 +245,16 @@ async function handleBatchUpload() {
     return
   }
 
+  const files = pendingPhotos.value.map((item) => item.file)
+  const validationMessage = validateUploadFiles(files)
+  if (validationMessage) {
+    uploadNotice.value = validationMessage
+    alert(validationMessage)
+    return
+  }
+
   try {
     uploading.value = true
-
-    const files = pendingPhotos.value.map((item) => item.file)
     const items: UploadPhotoPayload[] = pendingPhotos.value.map((item) => ({
       title: item.title.trim() || null,
       shot_month: item.shotMonth || null,
@@ -196,10 +262,16 @@ async function handleBatchUpload() {
     }))
 
     await uploadPhotos(files, items)
+    uploadNotice.value = ""
     alert("批量上传成功！")
     clearAllPending()
   } catch (error) {
-    alert(error instanceof Error ? error.message : "上传失败，请稍后再试")
+    const message =
+      error instanceof Error
+        ? error.message
+        : "上传失败，请稍后再试。若图片较大，请尝试压缩或分批上传。"
+    uploadNotice.value = message
+    alert(message)
   } finally {
     uploading.value = false
   }
@@ -244,6 +316,11 @@ onBeforeUnmount(() => {
       <p class="helper-text">
         选择后不会立刻上传。系统会尝试自动读取照片拍摄月份，读不到时可手动选择。
       </p>
+      <p class="helper-text">
+        为避免线上上传失败，单张图片和当前批次总大小都建议控制在
+        {{ formatBytes(MAX_BATCH_SIZE) }} 以内。
+      </p>
+      <p v-if="uploadNotice" class="upload-notice">{{ uploadNotice }}</p>
     </section>
 
     <div class="form-block">

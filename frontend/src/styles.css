@@ -395,6 +395,11 @@ button:disabled {
   font-size: 13px;
 }
 
+.upload-notice {
+  color: var(--danger);
+  font-size: 13px;
+}
+
 .member-grid,
 .upload-grid,
 .timeline-grid {

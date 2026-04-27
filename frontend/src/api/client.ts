@@ -15,6 +15,24 @@ type ErrorDetailItem = {
   loc?: Array<string | number>
 }
 
+function extractTextErrorMessage(payload: string, status: number): string {
+  const normalized = payload.trim()
+
+  if (!normalized) {
+    return "请求失败，请稍后再试"
+  }
+
+  if (
+    status === 413 ||
+    normalized.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
+    normalized.toLowerCase().includes("payload too large")
+  ) {
+    return "上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。"
+  }
+
+  return normalized
+}
+
 function extractErrorMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") {
     return "请求失败，请稍后再试"
@@ -56,12 +74,27 @@ function extractErrorMessage(payload: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init)
+  let response: Response
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, init)
+  } catch {
+    throw new Error("无法连接到服务，请检查网络、接口地址或稍后重试。")
+  }
+
   const contentType = response.headers.get("content-type") || ""
   const isJson = contentType.includes("application/json")
-  const payload = isJson ? await response.json() : null
+  const payload = isJson ? await response.json() : await response.text()
 
   if (!response.ok) {
+    if (typeof payload === "string" && payload.trim()) {
+      throw new Error(extractTextErrorMessage(payload, response.status))
+    }
+
+    if (response.status === 413) {
+      throw new Error("上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。")
+    }
+
     throw new Error(extractErrorMessage(payload))
   }
 

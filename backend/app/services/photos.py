@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote, urlparse
 from uuid import uuid4
@@ -207,7 +206,7 @@ def upload_photos(
         try:
             get_supabase().storage.from_(bucket).upload(
                 path=storage_path,
-                file=BytesIO(file.content),
+                file=file.content,
                 file_options={"content-type": file.content_type},
             )
             uploaded_to_storage = True
