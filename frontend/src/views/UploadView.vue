@@ -2,8 +2,9 @@
 import exifr from "exifr"
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 
-import { listPersons, uploadPhotos } from "../api/client"
-import type { Person, UploadPhotoPayload } from "../types"
+import { listPersons, registerUploadedPhotos } from "../api/client"
+import { getSupabaseClientOrThrow, uploadBucket } from "../utils/supabase"
+import type { Person, RegisterUploadedPhotoPayload } from "../types"
 
 const MAX_SINGLE_FILE_SIZE = 4 * 1024 * 1024
 const MAX_BATCH_SIZE = 4 * 1024 * 1024
@@ -34,6 +35,17 @@ function formatBytes(size: number) {
 
 function getTotalFileSize(files: File[]) {
   return files.reduce((total, file) => total + file.size, 0)
+}
+
+function getFileExtension(fileName: string) {
+  const parts = fileName.split(".")
+  if (parts.length <= 1) return ".jpg"
+  return `.${parts.pop()!.toLowerCase()}`
+}
+
+function createStoragePath(file: File) {
+  const month = defaultShotMonth.value || new Date().toISOString().slice(0, 7)
+  return `${month}/${crypto.randomUUID()}${getFileExtension(file.name)}`
 }
 
 function validateUploadFiles(files: File[]) {
@@ -245,8 +257,7 @@ async function handleBatchUpload() {
     return
   }
 
-  const files = pendingPhotos.value.map((item) => item.file)
-  const validationMessage = validateUploadFiles(files)
+  const validationMessage = validateUploadFiles(pendingPhotos.value.map((item) => item.file))
   if (validationMessage) {
     uploadNotice.value = validationMessage
     alert(validationMessage)
@@ -255,13 +266,41 @@ async function handleBatchUpload() {
 
   try {
     uploading.value = true
-    const items: UploadPhotoPayload[] = pendingPhotos.value.map((item) => ({
-      title: item.title.trim() || null,
-      shot_month: item.shotMonth || null,
-      person_ids: item.selectedPersons,
-    }))
+    const supabase = getSupabaseClientOrThrow()
+    const uploadedPaths: string[] = []
+    const items: RegisterUploadedPhotoPayload[] = []
 
-    await uploadPhotos(files, items)
+    for (const item of pendingPhotos.value) {
+      const storagePath = createStoragePath(item.file)
+      const { error: uploadError } = await supabase.storage.from(uploadBucket).upload(storagePath, item.file, {
+        contentType: item.file.type || "application/octet-stream",
+        upsert: false,
+      })
+
+      if (uploadError) {
+        throw new Error(`上传 ${item.file.name} 到存储失败：${uploadError.message}`)
+      }
+
+      uploadedPaths.push(storagePath)
+
+      const { data } = supabase.storage.from(uploadBucket).getPublicUrl(storagePath)
+      items.push({
+        image_url: data.publicUrl,
+        title: item.title.trim() || null,
+        shot_month: item.shotMonth || null,
+        person_ids: item.selectedPersons,
+      })
+    }
+
+    try {
+      await registerUploadedPhotos(items)
+    } catch (registerError) {
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from(uploadBucket).remove(uploadedPaths)
+      }
+      throw registerError
+    }
+
     uploadNotice.value = ""
     alert("批量上传成功！")
     clearAllPending()
