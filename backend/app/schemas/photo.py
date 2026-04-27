@@ -30,3 +30,11 @@ class UploadPhotoItem(BaseModel):
 
 class UploadPhotosRequest(BaseModel):
     items: list[UploadPhotoItem]
+
+
+class RegisterUploadedPhotoItem(UploadPhotoItem):
+    image_url: str
+
+
+class RegisterUploadedPhotosRequest(BaseModel):
+    items: list[RegisterUploadedPhotoItem]
