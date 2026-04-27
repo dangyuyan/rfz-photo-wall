@@ -5,10 +5,16 @@ import type {
   UpdatePhotoPayload,
   UploadPhotoPayload,
 } from "../types"
+import { supabase } from "../lib/supabase"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ??
   (import.meta.env.DEV ? "http://localhost:8000" : "")
+const SUPABASE_BUCKET = "photos"
+
+type RegisterUploadedPhotoPayload = UploadPhotoPayload & {
+  image_url: string
+}
 
 type ErrorDetailItem = {
   msg?: string
@@ -22,12 +28,8 @@ function extractTextErrorMessage(payload: string, status: number): string {
     return "请求失败，请稍后再试"
   }
 
-  if (
-    status === 413 ||
-    normalized.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
-    normalized.toLowerCase().includes("payload too large")
-  ) {
-    return "上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。"
+  if (normalized.includes("FUNCTION_PAYLOAD_TOO_LARGE") || normalized.toLowerCase().includes("payload too large")) {
+    return "上传内容过大，请压缩图片后再试。"
   }
 
   return normalized
@@ -92,7 +94,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     if (response.status === 413) {
-      throw new Error("上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。")
+      throw new Error("上传内容过大，请压缩图片后再试。")
     }
 
     throw new Error(extractErrorMessage(payload))
@@ -135,16 +137,69 @@ export function removePhoto(photoId: number) {
   })
 }
 
+function buildStoragePath(file: File) {
+  const extension = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : ""
+  const randomId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  return `${randomId}${extension || ".jpg"}`
+}
+
+async function uploadFileToSupabase(file: File) {
+  const storagePath = buildStoragePath(file)
+  const { error } = await supabase.storage.from(SUPABASE_BUCKET).upload(storagePath, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false,
+  })
+
+  if (error) {
+    throw new Error(error.message || `${file.name} 上传到存储失败`)
+  }
+
+  const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(storagePath)
+
+  if (!data.publicUrl) {
+    throw new Error(`${file.name} 上传成功，但未能获取公开地址`)
+  }
+
+  return {
+    storagePath,
+    image_url: data.publicUrl,
+  }
+}
+
 export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
-  const formData = new FormData()
-  formData.append("payload", JSON.stringify({ items }))
+  if (files.length !== items.length) {
+    throw new Error("上传文件数量与元数据数量不一致")
+  }
 
-  files.forEach((file) => {
-    formData.append("files", file)
-  })
+  const uploadedResults: Array<{ storagePath: string; image_url: string }> = []
 
-  return request<Photo[]>("/api/photos/upload", {
-    method: "POST",
-    body: formData,
-  })
+  try {
+    for (const file of files) {
+      uploadedResults.push(await uploadFileToSupabase(file))
+    }
+
+    const registerItems: RegisterUploadedPhotoPayload[] = items.map((item, index) => ({
+      ...item,
+      image_url: uploadedResults[index].image_url,
+    }))
+
+    return request<Photo[]>("/api/photos/register-upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ items: registerItems }),
+    })
+  } catch (error) {
+    if (uploadedResults.length > 0) {
+      const uploadedPaths = uploadedResults.map((item) => item.storagePath)
+      await supabase.storage.from(SUPABASE_BUCKET).remove(uploadedPaths).catch(() => undefined)
+    }
+
+    throw error
+  }
 }
