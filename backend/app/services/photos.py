@@ -6,7 +6,13 @@ from urllib.parse import quote, urlparse
 from uuid import uuid4
 
 from app.config import get_settings
-from app.schemas.photo import Photo, PhotoPerson, UpdatePhotoRequest, UploadPhotosRequest
+from app.schemas.photo import (
+    Photo,
+    PhotoPerson,
+    RegisterUploadedPhotosRequest,
+    UpdatePhotoRequest,
+    UploadPhotosRequest,
+)
 from app.services.supabase_client import get_supabase
 
 
@@ -247,6 +253,63 @@ def upload_photos(
 
             if uploaded_to_storage:
                 get_supabase().storage.from_(bucket).remove([storage_path])
+            raise
+
+    return created_photos
+
+
+def register_uploaded_photos(payload: RegisterUploadedPhotosRequest) -> list[Photo]:
+    created_photos: list[Photo] = []
+    created_photo_ids: list[int] = []
+
+    for item in payload.items:
+        image_url = item.image_url.strip()
+        if not image_url:
+            raise ValueError("图片地址不能为空")
+
+        storage_path = _extract_storage_path_from_public_url(image_url)
+        if not storage_path:
+            raise ValueError(f"非法图片地址: {image_url}")
+
+        title = item.title.strip() if item.title else ""
+        shot_month = item.shot_month.strip() if item.shot_month else ""
+        person_ids = _unique_person_ids(item.person_ids)
+        photo_id: int | None = None
+
+        try:
+            insert_response = (
+                get_supabase()
+                .table("photos")
+                .insert(
+                    {
+                        "title": title or None,
+                        "image_url": image_url,
+                        "shot_month": shot_month or None,
+                    }
+                )
+                .execute()
+            )
+            rows = insert_response.data or []
+            if not rows:
+                raise RuntimeError("写入照片记录失败")
+
+            photo_id = rows[0]["id"]
+            created_photo_ids.append(photo_id)
+
+            if person_ids:
+                relations = [
+                    {"photo_id": photo_id, "person_id": person_id}
+                    for person_id in person_ids
+                ]
+                get_supabase().table("photo_persons").insert(relations).execute()
+
+            created_photos.append(_fetch_photo_or_raise(photo_id))
+        except Exception:
+            if photo_id is not None:
+                get_supabase().table("photo_persons").delete().eq(
+                    "photo_id", photo_id
+                ).execute()
+                get_supabase().table("photos").delete().eq("id", photo_id).execute()
             raise
 
     return created_photos

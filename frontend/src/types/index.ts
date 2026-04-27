@@ -27,3 +27,7 @@ export type UploadPhotoPayload = {
   shot_month: string | null
   person_ids: number[]
 }
+
+export type RegisterUploadedPhotoPayload = UploadPhotoPayload & {
+  image_url: string
+}
