@@ -6,18 +6,12 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, sta
 from pydantic import ValidationError
 
 from app.schemas.common import ApiResponse
-from app.schemas.photo import (
-    Photo,
-    RegisterUploadedPhotosRequest,
-    UpdatePhotoRequest,
-    UploadPhotosRequest,
-)
+from app.schemas.photo import Photo, UpdatePhotoRequest, UploadPhotosRequest
 from app.services.photos import (
     IncomingUploadFile,
     PhotoNotFoundError,
     delete_photo,
     list_photos,
-    register_uploaded_photos,
     update_photo,
     upload_photos,
 )
@@ -77,22 +71,6 @@ async def post_upload(
 
     try:
         photos = upload_photos(incoming_files, parsed_payload)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-    return ApiResponse(data=photos, message="照片上传成功")
-
-
-@router.post(
-    "/register-upload",
-    response_model=ApiResponse[list[Photo]],
-    status_code=status.HTTP_201_CREATED,
-)
-def post_register_upload(
-    payload: RegisterUploadedPhotosRequest,
-) -> ApiResponse[list[Photo]]:
-    try:
-        photos = register_uploaded_photos(payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
