@@ -43,9 +43,6 @@ http://localhost:8000/api/health
 
 ```env
 VITE_API_BASE_URL=http://localhost:8000
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_SUPABASE_BUCKET=photos
 ```
 
 ### 4) 启动前端

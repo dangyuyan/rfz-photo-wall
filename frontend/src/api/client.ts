@@ -2,7 +2,6 @@ import type {
   ApiResponse,
   Person,
   Photo,
-  RegisterUploadedPhotoPayload,
   UpdatePhotoPayload,
   UploadPhotoPayload,
 } from "../types"
@@ -147,15 +146,5 @@ export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
   return request<Photo[]>("/api/photos/upload", {
     method: "POST",
     body: formData,
-  })
-}
-
-export function registerUploadedPhotos(items: RegisterUploadedPhotoPayload[]) {
-  return request<Photo[]>("/api/photos/register-upload", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ items }),
   })
 }
