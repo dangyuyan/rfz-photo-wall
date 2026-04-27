@@ -5,7 +5,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 import { listPersons, uploadPhotos } from "../api/client"
 import type { Person, UploadPhotoPayload } from "../types"
 
-const MAX_SINGLE_FILE_SIZE = 20 * 1024 * 1024
+const MAX_SINGLE_FILE_SIZE = 4 * 1024 * 1024
+const MAX_BATCH_SIZE = 4 * 1024 * 1024
 
 type PendingPhoto = {
   id: string
@@ -45,6 +46,11 @@ function validateUploadFiles(files: File[]) {
       .join("、")
     const suffix = oversizedFiles.length > 3 ? " 等文件" : ""
     return `以下图片超过单张 ${formatBytes(MAX_SINGLE_FILE_SIZE)} 限制：${names}${suffix}。请先压缩后再上传。`
+  }
+
+  const totalSize = getTotalFileSize(files)
+  if (totalSize > MAX_BATCH_SIZE) {
+    return `当前批次总大小为 ${formatBytes(totalSize)}，已超过 ${formatBytes(MAX_BATCH_SIZE)} 限制。请减少张数或分批上传。`
   }
 
   return ""
@@ -118,6 +124,18 @@ async function handleFilesChange(event: Event) {
   if (validationMessage) {
     uploadNotice.value = validationMessage
     alert(validationMessage)
+    target.value = ""
+    return
+  }
+
+  const combinedFiles = [
+    ...pendingPhotos.value.map((item) => item.file),
+    ...imageFiles,
+  ]
+  const combinedValidationMessage = validateUploadFiles(combinedFiles)
+  if (combinedValidationMessage) {
+    uploadNotice.value = `加入当前待上传列表后会超限。${combinedValidationMessage}`
+    alert(uploadNotice.value)
     target.value = ""
     return
   }
@@ -299,8 +317,8 @@ onBeforeUnmount(() => {
         选择后不会立刻上传。系统会尝试自动读取照片拍摄月份，读不到时可手动选择。
       </p>
       <p class="helper-text">
-        现在已改为直传 Supabase，单张图片暂建议控制在 {{ formatBytes(MAX_SINGLE_FILE_SIZE) }}
-        以内，批量上传不再受 Vercel 单次请求体限制。
+        为避免线上上传失败，单张图片和当前批次总大小都建议控制在
+        {{ formatBytes(MAX_BATCH_SIZE) }} 以内。
       </p>
       <p v-if="uploadNotice" class="upload-notice">{{ uploadNotice }}</p>
     </section>
