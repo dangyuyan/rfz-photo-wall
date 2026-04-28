@@ -73,6 +73,42 @@ def _build_public_url(path: str) -> str:
     return f"{settings.supabase_url}/storage/v1/object/public/{bucket}/{quoted_path}"
 
 
+def _build_signed_upload_url(path: str, token: str) -> str:
+    settings = get_settings()
+    base_url = settings.supabase_url.rstrip("/")
+    bucket = settings.supabase_bucket
+    quoted_path = quote(path, safe="/")
+    return f"{base_url}/storage/v1/object/upload/sign/{bucket}/{quoted_path}?token={token}"
+
+
+def _extract_signed_upload_url(signed_data: object, storage_path: str) -> str:
+    signed_url: str | None = None
+    token: str | None = None
+
+    if isinstance(signed_data, dict):
+        signed_url = (
+            signed_data.get("signed_url")
+            or signed_data.get("signedUrl")
+            or signed_data.get("signedURL")
+        )
+        token = signed_data.get("token")
+    else:
+        signed_url = (
+            getattr(signed_data, "signed_url", None)
+            or getattr(signed_data, "signedUrl", None)
+            or getattr(signed_data, "signedURL", None)
+        )
+        token = getattr(signed_data, "token", None)
+
+    if signed_url:
+        return signed_url
+
+    if token:
+        return _build_signed_upload_url(storage_path, token)
+
+    raise RuntimeError("创建上传地址失败：签名结果缺少 signed_url/token")
+
+
 def _extract_storage_path_from_public_url(image_url: str | None) -> str | None:
     if not image_url:
         return None
@@ -197,11 +233,12 @@ def create_upload_tickets(payload: CreateUploadTicketsRequest) -> list[dict[str,
 
         file_extension = Path(file.filename).suffix or ".jpg"
         storage_path = f"{uuid4().hex}{file_extension.lower()}"
-        signed_data = storage.create_signed_upload_url(storage_path)
-        signed_url = signed_data.get("signed_url") or signed_data.get("signedUrl")
+        create_signed_upload_url = getattr(storage, "create_signed_upload_url", None)
+        if not callable(create_signed_upload_url):
+            raise RuntimeError("当前 Supabase SDK 不支持 create_signed_upload_url")
 
-        if not signed_url:
-            raise RuntimeError("创建上传地址失败")
+        signed_data = create_signed_upload_url(storage_path)
+        signed_url = _extract_signed_upload_url(signed_data, storage_path)
 
         tickets.append(
             {

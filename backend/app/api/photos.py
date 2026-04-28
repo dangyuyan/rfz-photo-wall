@@ -97,6 +97,11 @@ def post_upload_tickets(
         tickets = create_upload_tickets(payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"创建上传地址失败: {error}",
+        ) from error
 
     return ApiResponse(data=tickets, message="上传地址创建成功")
 
@@ -113,5 +118,10 @@ def post_upload_finalize(
         photos = finalize_uploaded_photos(payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"完成上传入库失败: {error}",
+        ) from error
 
     return ApiResponse(data=photos, message="照片上传成功")
