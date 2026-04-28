@@ -27,3 +27,8 @@ export type UploadPhotoPayload = {
   shot_month: string | null
   person_ids: number[]
 }
+
+export type UploadTicket = {
+  storage_path: string
+  signed_url: string
+}

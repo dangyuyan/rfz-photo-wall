@@ -6,7 +6,14 @@ from urllib.parse import quote, urlparse
 from uuid import uuid4
 
 from app.config import get_settings
-from app.schemas.photo import Photo, PhotoPerson, UpdatePhotoRequest, UploadPhotosRequest
+from app.schemas.photo import (
+    CreateUploadTicketsRequest,
+    FinalizeUploadPhotosRequest,
+    Photo,
+    PhotoPerson,
+    UpdatePhotoRequest,
+    UploadPhotosRequest,
+)
 from app.services.supabase_client import get_supabase
 
 
@@ -177,6 +184,88 @@ def delete_photo(photo_id: int) -> None:
 
     if storage_path:
         get_supabase().storage.from_(get_settings().supabase_bucket).remove([storage_path])
+
+
+def create_upload_tickets(payload: CreateUploadTicketsRequest) -> list[dict[str, str]]:
+    bucket = get_settings().supabase_bucket
+    storage = get_supabase().storage.from_(bucket)
+    tickets: list[dict[str, str]] = []
+
+    for file in payload.files:
+        if not file.content_type.startswith("image/"):
+            raise ValueError(f"{file.filename} 不是图片文件")
+
+        file_extension = Path(file.filename).suffix or ".jpg"
+        storage_path = f"{uuid4().hex}{file_extension.lower()}"
+        signed_data = storage.create_signed_upload_url(storage_path)
+        signed_url = signed_data.get("signed_url") or signed_data.get("signedUrl")
+
+        if not signed_url:
+            raise RuntimeError("创建上传地址失败")
+
+        tickets.append(
+            {
+                "storage_path": storage_path,
+                "signed_url": signed_url,
+            }
+        )
+
+    return tickets
+
+
+def finalize_uploaded_photos(payload: FinalizeUploadPhotosRequest) -> list[Photo]:
+    bucket = get_settings().supabase_bucket
+    created_photos: list[Photo] = []
+
+    for item in payload.items:
+        storage_path = item.storage_path.strip()
+        if not storage_path:
+            raise ValueError("存在无效的 storage_path")
+
+        title = item.title.strip() if item.title else ""
+        shot_month = item.shot_month.strip() if item.shot_month else ""
+        person_ids = _unique_person_ids(item.person_ids)
+        photo_id: int | None = None
+
+        try:
+            insert_response = (
+                get_supabase()
+                .table("photos")
+                .insert(
+                    {
+                        "title": title or None,
+                        "image_url": _build_public_url(storage_path),
+                        "shot_month": shot_month or None,
+                    }
+                )
+                .execute()
+            )
+            rows = insert_response.data or []
+
+            if not rows:
+                raise RuntimeError("写入照片记录失败")
+
+            photo_id = rows[0]["id"]
+
+            if person_ids:
+                relations = [
+                    {"photo_id": photo_id, "person_id": person_id}
+                    for person_id in person_ids
+                ]
+                get_supabase().table("photo_persons").insert(relations).execute()
+
+            created_photos.append(_fetch_photo_or_raise(photo_id))
+        except Exception:
+            if photo_id is not None:
+                get_supabase().table("photo_persons").delete().eq(
+                    "photo_id", photo_id
+                ).execute()
+                get_supabase().table("photos").delete().eq("id", photo_id).execute()
+
+            get_supabase().storage.from_(bucket).remove([storage_path])
+            raise
+
+    return created_photos
 
 
 def upload_photos(

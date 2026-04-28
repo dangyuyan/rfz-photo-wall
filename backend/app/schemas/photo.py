@@ -30,3 +30,25 @@ class UploadPhotoItem(BaseModel):
 
 class UploadPhotosRequest(BaseModel):
     items: list[UploadPhotoItem]
+
+
+class UploadTicketRequestItem(BaseModel):
+    filename: str
+    content_type: str
+
+
+class CreateUploadTicketsRequest(BaseModel):
+    files: list[UploadTicketRequestItem]
+
+
+class UploadTicket(BaseModel):
+    storage_path: str
+    signed_url: str
+
+
+class FinalizeUploadPhotoItem(UploadPhotoItem):
+    storage_path: str
+
+
+class FinalizeUploadPhotosRequest(BaseModel):
+    items: list[FinalizeUploadPhotoItem]

@@ -6,11 +6,19 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, sta
 from pydantic import ValidationError
 
 from app.schemas.common import ApiResponse
-from app.schemas.photo import Photo, UpdatePhotoRequest, UploadPhotosRequest
+from app.schemas.photo import (
+    CreateUploadTicketsRequest,
+    FinalizeUploadPhotosRequest,
+    Photo,
+    UpdatePhotoRequest,
+    UploadPhotosRequest,
+)
 from app.services.photos import (
     IncomingUploadFile,
     PhotoNotFoundError,
+    create_upload_tickets,
     delete_photo,
+    finalize_uploaded_photos,
     list_photos,
     update_photo,
     upload_photos,
@@ -71,6 +79,38 @@ async def post_upload(
 
     try:
         photos = upload_photos(incoming_files, parsed_payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+    return ApiResponse(data=photos, message="照片上传成功")
+
+
+@router.post(
+    "/upload-tickets",
+    response_model=ApiResponse[list[dict[str, str]]],
+    status_code=status.HTTP_201_CREATED,
+)
+def post_upload_tickets(
+    payload: CreateUploadTicketsRequest,
+) -> ApiResponse[list[dict[str, str]]]:
+    try:
+        tickets = create_upload_tickets(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+    return ApiResponse(data=tickets, message="上传地址创建成功")
+
+
+@router.post(
+    "/upload-finalize",
+    response_model=ApiResponse[list[Photo]],
+    status_code=status.HTTP_201_CREATED,
+)
+def post_upload_finalize(
+    payload: FinalizeUploadPhotosRequest,
+) -> ApiResponse[list[Photo]]:
+    try:
+        photos = finalize_uploaded_photos(payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
