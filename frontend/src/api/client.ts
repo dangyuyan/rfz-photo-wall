@@ -27,7 +27,7 @@ function extractTextErrorMessage(payload: string, status: number): string {
     normalized.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
     normalized.toLowerCase().includes("payload too large")
   ) {
-    return "上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。"
+    return "上传内容过大，请减少单次上传数量或分批上传。"
   }
 
   return normalized
@@ -92,7 +92,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     if (response.status === 413) {
-      throw new Error("上传内容过大，请压缩图片或分批上传（线上单次请求建议控制在 4MB 以内）。")
+      throw new Error("上传内容过大，请减少单次上传数量或分批上传。")
     }
 
     throw new Error(extractErrorMessage(payload))
