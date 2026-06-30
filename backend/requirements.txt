@@ -1,5 +1,4 @@
 fastapi
 python-multipart
 python-dotenv
-supabase
 uvicorn

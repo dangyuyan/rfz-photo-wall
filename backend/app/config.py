@@ -21,9 +21,9 @@ def _first_non_empty(*names: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    supabase_url: str
-    supabase_service_role_key: str
-    supabase_bucket: str
+    database_url: str
+    upload_dir: Path
+    public_base_url: str
     cors_origins: tuple[str, ...]
 
 
@@ -37,26 +37,16 @@ def _parse_cors_origins(raw_value: str | None) -> tuple[str, ...]:
 
 @lru_cache
 def get_settings() -> Settings:
-    supabase_url = _first_non_empty("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
-    supabase_service_role_key = _first_non_empty(
-        "SUPABASE_SERVICE_ROLE_KEY",
-        "SUPABASE_ANON_KEY",
-        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    )
-
-    if not supabase_url:
-        raise RuntimeError(
-            "Missing required environment variable: SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL"
-        )
-
-    if not supabase_service_role_key:
-        raise RuntimeError(
-            "Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, or NEXT_PUBLIC_SUPABASE_ANON_KEY"
-        )
+    backend_root = Path(__file__).resolve().parents[1]
+    database_url = os.getenv("DATABASE_URL", "sqlite:///./data/photo_wall.db").strip()
+    upload_dir = os.getenv("UPLOAD_DIR", "./uploads").strip() or "./uploads"
+    public_base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").strip()
 
     return Settings(
-        supabase_url=supabase_url,
-        supabase_service_role_key=supabase_service_role_key,
-        supabase_bucket=os.getenv("SUPABASE_BUCKET", "photos").strip() or "photos",
+        database_url=database_url,
+        upload_dir=(backend_root / upload_dir).resolve()
+        if not Path(upload_dir).is_absolute()
+        else Path(upload_dir),
+        public_base_url=public_base_url.rstrip("/"),
         cors_origins=_parse_cors_origins(os.getenv("BACKEND_CORS_ORIGINS")),
     )

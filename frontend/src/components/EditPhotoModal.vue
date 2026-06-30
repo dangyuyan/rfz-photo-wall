@@ -77,7 +77,20 @@ async function saveEdit() {
         <button class="ghost-btn small-btn" @click="emit('close')">关闭</button>
       </div>
 
-      <img :src="photo.image_url" :alt="photo.title || 'photo'" class="modal-image" />
+      <img
+        v-if="photo.media_type === 'image'"
+        :src="photo.image_url"
+        :alt="photo.title || 'photo'"
+        class="modal-image"
+      />
+      <video
+        v-else
+        :src="photo.image_url"
+        class="modal-image"
+        controls
+        playsinline
+        preload="metadata"
+      />
 
       <div class="form-block">
         <label class="form-label">照片标题</label>

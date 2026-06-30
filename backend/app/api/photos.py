@@ -7,8 +7,6 @@ from pydantic import ValidationError
 
 from app.schemas.common import ApiResponse
 from app.schemas.photo import (
-    CreateUploadTicketsRequest,
-    FinalizeUploadPhotosRequest,
     Photo,
     UpdatePhotoRequest,
     UploadPhotosRequest,
@@ -16,9 +14,7 @@ from app.schemas.photo import (
 from app.services.photos import (
     IncomingUploadFile,
     PhotoNotFoundError,
-    create_upload_tickets,
     delete_photo,
-    finalize_uploaded_photos,
     list_photos,
     update_photo,
     upload_photos,
@@ -40,6 +36,8 @@ def patch_photo(photo_id: int, payload: UpdatePhotoRequest) -> ApiResponse[Photo
         photo = update_photo(photo_id, payload)
     except PhotoNotFoundError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
     return ApiResponse(data=photo, message="照片更新成功")
 
@@ -81,47 +79,5 @@ async def post_upload(
         photos = upload_photos(incoming_files, parsed_payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-    return ApiResponse(data=photos, message="照片上传成功")
-
-
-@router.post(
-    "/upload-tickets",
-    response_model=ApiResponse[list[dict[str, str]]],
-    status_code=status.HTTP_201_CREATED,
-)
-def post_upload_tickets(
-    payload: CreateUploadTicketsRequest,
-) -> ApiResponse[list[dict[str, str]]]:
-    try:
-        tickets = create_upload_tickets(payload)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"创建上传地址失败: {error}",
-        ) from error
-
-    return ApiResponse(data=tickets, message="上传地址创建成功")
-
-
-@router.post(
-    "/upload-finalize",
-    response_model=ApiResponse[list[Photo]],
-    status_code=status.HTTP_201_CREATED,
-)
-def post_upload_finalize(
-    payload: FinalizeUploadPhotosRequest,
-) -> ApiResponse[list[Photo]]:
-    try:
-        photos = finalize_uploaded_photos(payload)
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"完成上传入库失败: {error}",
-        ) from error
 
     return ApiResponse(data=photos, message="照片上传成功")

@@ -4,7 +4,6 @@ import type {
   Photo,
   UpdatePhotoPayload,
   UploadPhotoPayload,
-  UploadTicket,
 } from "../types"
 
 const API_BASE_URL =
@@ -136,57 +135,19 @@ export function removePhoto(photoId: number) {
   })
 }
 
-async function uploadFileToSignedUrl(file: File, signedUrl: string) {
-  const response = await fetch(signedUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type || "application/octet-stream",
-    },
-    body: file,
-  })
-
-  if (!response.ok) {
-    const payload = await response.text()
-    throw new Error(extractTextErrorMessage(payload, response.status))
-  }
-}
-
 export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
   if (files.length !== items.length) {
     throw new Error("上传文件数量与元数据数量不一致。")
   }
 
-  const tickets = await request<UploadTicket[]>("/api/photos/upload-tickets", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      files: files.map((file) => ({
-        filename: file.name,
-        content_type: file.type || "application/octet-stream",
-      })),
-    }),
-  })
-
-  if (tickets.length !== files.length) {
-    throw new Error("创建上传地址失败，请稍后重试。")
+  const formData = new FormData()
+  for (const file of files) {
+    formData.append("files", file)
   }
+  formData.append("payload", JSON.stringify({ items }))
 
-  for (let index = 0; index < files.length; index += 1) {
-    await uploadFileToSignedUrl(files[index], tickets[index].signed_url)
-  }
-
-  return request<Photo[]>("/api/photos/upload-finalize", {
+  return request<Photo[]>("/api/photos/upload", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      items: items.map((item, index) => ({
-        ...item,
-        storage_path: tickets[index].storage_path,
-      })),
-    }),
+    body: formData,
   })
 }

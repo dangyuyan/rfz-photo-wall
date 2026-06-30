@@ -3,12 +3,13 @@ import exifr from "exifr"
 import { computed, onBeforeUnmount, onMounted, ref } from "vue"
 
 import { listPersons, uploadPhotos } from "../api/client"
-import type { Person, UploadPhotoPayload } from "../types"
+import type { MediaType, Person, UploadPhotoPayload } from "../types"
 
 type PendingPhoto = {
   id: string
   file: File
   previewUrl: string
+  mediaType: MediaType
   title: string
   shotMonth: string
   selectedPersons: number[]
@@ -33,13 +34,27 @@ function getTotalFileSize(files: File[]) {
   return files.reduce((total, file) => total + file.size, 0)
 }
 
-async function getPhotoMonth(file: File) {
-  try {
-    const exif = await exifr.parse(file)
-    const date = exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate
+function getMediaType(file: File): MediaType | null {
+  if (file.type.startsWith("image/")) return "image"
+  if (file.type.startsWith("video/")) return "video"
+  return null
+}
 
-    if (date) {
-      const parsedDate = new Date(date)
+async function getShotMonth(file: File, mediaType: MediaType) {
+  try {
+    const date =
+      mediaType === "image"
+        ? (() => {
+            return exifr
+              .parse(file)
+              .then((exif) => exif?.DateTimeOriginal || exif?.CreateDate || exif?.ModifyDate)
+          })()
+        : Promise.resolve(null)
+
+    const resolvedDate = await date
+
+    if (resolvedDate) {
+      const parsedDate = new Date(resolvedDate)
       if (!Number.isNaN(parsedDate.getTime())) {
         const year = parsedDate.getFullYear()
         const month = String(parsedDate.getMonth() + 1).padStart(2, "0")
@@ -56,7 +71,7 @@ async function getPhotoMonth(file: File) {
 
     return ""
   } catch (error) {
-    console.log("读取照片 EXIF 失败:", error)
+    console.log("读取媒体时间失败:", error)
 
     if (file.lastModified) {
       const lastModifiedDate = new Date(file.lastModified)
@@ -88,24 +103,27 @@ async function handleFilesChange(event: Event) {
   const files = Array.from(target.files || [])
   if (files.length === 0) return
 
-  const imageFiles = files.filter((file) => file.type.startsWith("image/"))
+  const supportedFiles = files
+    .map((file) => ({ file, mediaType: getMediaType(file) }))
+    .filter((item): item is { file: File; mediaType: MediaType } => item.mediaType !== null)
 
-  if (imageFiles.length === 0) {
-    uploadNotice.value = "请选择图片文件"
-    alert("请选择图片文件")
+  if (supportedFiles.length === 0) {
+    uploadNotice.value = "请选择图片或视频文件"
+    alert("请选择图片或视频文件")
     target.value = ""
     return
   }
 
   const newItems: PendingPhoto[] = []
 
-  for (const file of imageFiles) {
-    const autoMonth = await getPhotoMonth(file)
+  for (const { file, mediaType } of supportedFiles) {
+    const autoMonth = await getShotMonth(file, mediaType)
 
     newItems.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
       previewUrl: URL.createObjectURL(file),
+      mediaType,
       title: file.name.replace(/\.[^/.]+$/, ""),
       shotMonth: autoMonth || defaultShotMonth.value,
       selectedPersons: [...defaultSelectedPersons.value],
@@ -113,7 +131,7 @@ async function handleFilesChange(event: Event) {
   }
 
   pendingPhotos.value = [...pendingPhotos.value, ...newItems]
-  uploadNotice.value = `已选择 ${pendingPhotos.value.length} 张图片，总大小 ${formatBytes(
+  uploadNotice.value = `已选择 ${pendingPhotos.value.length} 个文件，总大小 ${formatBytes(
     getTotalFileSize(pendingPhotos.value.map((item) => item.file)),
   )}。`
   target.value = ""
@@ -198,7 +216,7 @@ function clearAllPending() {
 
 async function handleBatchUpload() {
   if (pendingPhotos.value.length === 0) {
-    alert("请先选择照片")
+    alert("请先选择要上传的文件")
     return
   }
 
@@ -246,26 +264,26 @@ onBeforeUnmount(() => {
 <template>
   <div class="page-stack">
     <section class="hero-card">
-      <h1>上传照片</h1>
-      <p>支持多图上传、批量套用默认月份和人物，也可以逐张微调。</p>
+      <h1>上传照片 / 视频</h1>
+      <p>支持图片和视频批量上传、批量套用默认月份和人物，也可以逐个微调。</p>
     </section>
 
     <section class="panel-card">
       <div class="section-title-row">
-        <h2>选择照片</h2>
-        <span class="badge">{{ pendingPhotos.length }} 张待上传</span>
+        <h2>选择文件</h2>
+        <span class="badge">{{ pendingPhotos.length }} 个待上传</span>
       </div>
 
       <input
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         multiple
         :disabled="uploading"
         @change="handleFilesChange"
       />
 
       <p class="helper-text">
-        选择后不会立刻上传。系统会尝试自动读取照片拍摄月份，读不到时可手动选择。
+        选择后不会立刻上传。图片会优先尝试读取 EXIF 拍摄月份，视频默认回退到文件修改时间。
       </p>
       <p class="helper-text">若上传失败请尝试分批上传。</p>
       <p v-if="uploadNotice" class="upload-notice">{{ uploadNotice }}</p>
@@ -376,17 +394,27 @@ onBeforeUnmount(() => {
       <div v-else class="upload-grid">
         <div v-for="item in pendingPhotos" :key="item.id" class="upload-card">
           <img
+            v-if="item.mediaType === 'image'"
             :src="item.previewUrl"
-            :alt="item.title || '待上传照片'"
+            :alt="item.title || '待上传文件'"
             class="upload-preview"
+          />
+          <video
+            v-else
+            :src="item.previewUrl"
+            class="upload-preview"
+            controls
+            muted
+            playsinline
+            preload="metadata"
           />
 
           <div class="form-block">
-            <label class="form-label">照片标题</label>
+            <label class="form-label">{{ item.mediaType === "video" ? "视频标题" : "照片标题" }}</label>
             <input
               :value="item.title"
               class="text-input full-input"
-              placeholder="照片标题"
+              :placeholder="item.mediaType === 'video' ? '视频标题' : '照片标题'"
               :disabled="uploading"
               @input="handlePendingTitleInput(item.id, $event)"
             />
@@ -404,7 +432,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="form-block">
-            <label class="form-label">照片人物</label>
+            <label class="form-label">{{ item.mediaType === "video" ? "视频人物" : "照片人物" }}</label>
 
             <p v-if="persons.length === 0" class="helper-text">暂无成员。</p>
 

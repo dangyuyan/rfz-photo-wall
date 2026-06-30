@@ -6,10 +6,16 @@ import PhotoPreviewModal from "../components/PhotoPreviewModal.vue"
 import { listPersons, listPhotos, removePhoto } from "../api/client"
 import type { Person, Photo } from "../types"
 import { downloadPhotoToLocal } from "../utils/download"
+import { buildMediaSummary } from "../utils/media"
 
 type PreviewPhoto = {
   title: string | null
   image_url: string
+  media_type: "image" | "video"
+  poster_url?: string | null
+  duration_seconds?: number | null
+  width?: number | null
+  height?: number | null
   shot_month?: string | null
   personNames?: string
 }
@@ -50,6 +56,20 @@ async function fetchPhotos() {
 
 function getPersonNames(photo: Photo) {
   return photo.persons.map((person) => person.name).join(" · ") || "未标记人物"
+}
+
+function getPreviewPhoto(photo: Photo): PreviewPhoto {
+  return {
+    title: photo.title,
+    image_url: photo.image_url,
+    media_type: photo.media_type,
+    poster_url: photo.poster_url,
+    duration_seconds: photo.duration_seconds,
+    width: photo.width,
+    height: photo.height,
+    shot_month: photo.shot_month,
+    personNames: getPersonNames(photo),
+  }
 }
 
 async function deletePhoto(photo: Photo) {
@@ -235,23 +255,36 @@ onMounted(() => {
               <div class="timeline-grid">
                 <div v-for="photo in monthGroup.photos" :key="photo.id" class="photo-card">
                   <img
+                    v-if="photo.media_type === 'image'"
                     :src="photo.image_url"
                     alt=""
                     class="photo-image clickable-image"
-                    @click="
-                      previewPhoto = {
-                        title: photo.title,
-                        image_url: photo.image_url,
-                        shot_month: photo.shot_month,
-                        personNames: getPersonNames(photo),
-                      }
-                    "
+                    @click="previewPhoto = getPreviewPhoto(photo)"
+                  />
+                  <img
+                    v-else-if="photo.poster_url"
+                    :src="photo.poster_url"
+                    alt=""
+                    class="photo-image clickable-image"
+                    @click="previewPhoto = getPreviewPhoto(photo)"
+                  />
+                  <video
+                    v-else
+                    :src="photo.image_url"
+                    class="photo-image clickable-image"
+                    muted
+                    playsinline
+                    preload="metadata"
+                    @click="previewPhoto = getPreviewPhoto(photo)"
                   />
 
                   <div class="photo-card-body">
                     <div class="photo-title">{{ photo.title || "未命名照片" }}</div>
                     <div class="photo-meta">{{ getPersonNames(photo) }}</div>
                     <div class="photo-submeta">{{ photo.shot_month || "未填写时间" }}</div>
+                    <div v-if="buildMediaSummary(photo)" class="photo-submeta">
+                      {{ buildMediaSummary(photo) }}
+                    </div>
 
                     <div class="card-actions">
                       <button

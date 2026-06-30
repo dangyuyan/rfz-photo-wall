@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+MediaType = Literal["image", "video"]
 
 
 class PhotoPerson(BaseModel):
@@ -12,6 +16,11 @@ class Photo(BaseModel):
     id: int
     title: str | None = None
     image_url: str
+    media_type: MediaType = "image"
+    poster_url: str | None = None
+    duration_seconds: float | None = None
+    width: int | None = None
+    height: int | None = None
     shot_month: str | None = None
     persons: list[PhotoPerson] = Field(default_factory=list)
 
@@ -30,25 +39,3 @@ class UploadPhotoItem(BaseModel):
 
 class UploadPhotosRequest(BaseModel):
     items: list[UploadPhotoItem]
-
-
-class UploadTicketRequestItem(BaseModel):
-    filename: str
-    content_type: str
-
-
-class CreateUploadTicketsRequest(BaseModel):
-    files: list[UploadTicketRequestItem]
-
-
-class UploadTicket(BaseModel):
-    storage_path: str
-    signed_url: str
-
-
-class FinalizeUploadPhotoItem(UploadPhotoItem):
-    storage_path: str
-
-
-class FinalizeUploadPhotosRequest(BaseModel):
-    items: list[FinalizeUploadPhotoItem]

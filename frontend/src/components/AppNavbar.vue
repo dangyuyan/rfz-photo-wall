@@ -6,7 +6,7 @@ const route = useRoute()
 
 const navItems = [
   { href: "/members", label: "成员管理" },
-  { href: "/upload", label: "上传照片" },
+  { href: "/upload", label: "上传文件" },
   { href: "/timeline", label: "时间轴" },
   { href: "/wall", label: "照片墙" },
 ]

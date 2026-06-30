@@ -1,6 +1,7 @@
 # RFZ Photo Wall
 
-前端使用 `Vue 3 + Vite`，后端使用 `FastAPI`，数据和图片存储使用 `Supabase`。
+前端使用 `Vue 3 + Vite`，后端使用 `FastAPI`，数据存储使用本地 `SQLite`，图片存储使用 `backend/uploads/` 目录。
+如果机器安装了 `ffmpeg` / `ffprobe`，后端会为视频自动补充基础媒体处理：提取时长与分辨率、转码为 `mp4`、生成封面图；未安装时会降级为原文件直存。
 
 ## 项目结构
 
@@ -15,9 +16,9 @@
 参考 `backend/.env.example`，在 `backend/.env` 中填写：
 
 ```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_BUCKET=photos
+DATABASE_URL=sqlite:///./data/photo_wall.db
+UPLOAD_DIR=./uploads
+PUBLIC_BASE_URL=http://localhost:8000
 BACKEND_CORS_ORIGINS=http://localhost:5173
 ```
 
@@ -30,6 +31,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+可选安装：
+
+```bash
+brew install ffmpeg
+```
+
+安装后，新上传的视频会自动尝试转码并生成封面。
 
 健康检查：
 
@@ -59,38 +68,69 @@ npm run dev
 http://localhost:5173
 ```
 
-## Vercel 部署（单个项目同时部署前后端）
+## Vercel 部署（说明）
 
-当前仓库已按“单个 Vercel 项目”配置完成：
+当前代码已经改成 `SQLite + 本地 uploads` 方案，这适合本地开发，不适合作为 Vercel 上的持久化存储方案。Vercel 的文件系统和本地 SQLite 都不能当正式持久化数据库使用。
 
-- 根目录 `vercel.json` 统一负责构建与路由
-- `backend/api/index.py` 作为 Python Function 入口
-- `/api/*` 由 FastAPI 处理，其他路由回退到前端 `index.html`
+如果你还要线上部署，需要把存储再切到真正的数据库和对象存储。
 
-### Vercel 项目设置
+## 阿里云 ECS 部署
 
-- Root Directory：仓库根目录（不要填 `frontend` 或 `backend`）
-- 环境变量（Production / Preview 都建议配置）：
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `SUPABASE_BUCKET`
-  - `BACKEND_CORS_ORIGINS`
+推荐把前端、后端、SQLite 数据库和上传文件都放在同一台服务器上，由 `nginx` 对外提供访问：
 
-建议值：
+- `/`：前端静态文件
+- `/api/*`：反向代理到 FastAPI
+- `/uploads/*`：反向代理到 FastAPI 暴露的上传文件
 
-```env
-BACKEND_CORS_ORIGINS=https://your-project.vercel.app
+服务器目录示例：
+
+```text
+/var/www/rfz-photo-wall/
+  backend/
+  frontend/
 ```
 
-说明：
+后端生产环境变量 `backend/.env` 示例：
 
-- 单项目同域部署时，前端默认请求同域 `/api/*`
-- `VITE_API_BASE_URL` 在线上可不填；本地开发仍可用 `frontend/.env` 指向 `http://localhost:8000`
+```env
+DATABASE_URL=sqlite:////var/www/rfz-photo-wall/backend/data/photo_wall.db
+UPLOAD_DIR=/var/www/rfz-photo-wall/backend/uploads
+PUBLIC_BASE_URL=
+BACKEND_CORS_ORIGINS=http://39.96.203.225
+```
 
-### 部署后检查
+`PUBLIC_BASE_URL` 留空时，后端会返回 `/uploads/...` 这种同域名相对地址，更适合前后端都在同一台服务器、同一个域名下部署。
 
-1. 健康检查：`https://your-project.vercel.app/api/health`
-2. 打开首页，确认成员列表 / 照片列表能正常加载。
+前端生产环境可以不设置 `VITE_API_BASE_URL`，构建后会默认请求同域名的 `/api/*`。如果要显式设置，可以写：
+
+```env
+VITE_API_BASE_URL=
+```
+
+构建前端：
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+启动后端：
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+仓库里的 `deploy/` 目录提供了两个模板：
+
+- `deploy/nginx.rfz-photo-wall.conf.example`：nginx 站点配置
+- `deploy/rfz-photo-wall.service.example`：systemd 后端服务配置
+
+上线时把模板里的 `/var/www/rfz-photo-wall` 改成你的真实服务器路径。当前 nginx 模板已经按公网 IP `39.96.203.225` 配好。
 
 ## 常见问题
 
@@ -102,17 +142,19 @@ BACKEND_CORS_ORIGINS=https://your-project.vercel.app
 - 后端 `BACKEND_CORS_ORIGINS` 是否包含当前前端域名
 - 如果你手动设置了 `VITE_API_BASE_URL`，不要填错误地址
 
-### 2) `ModuleNotFoundError: No module named 'supabase'`
+### 2) `sqlite3.OperationalError: unable to open database file`
 
-本地运行后端缺依赖，执行：
+通常是数据库目录不存在或没有写权限。当前代码会自动创建 `backend/data/`，如果你改了 `DATABASE_URL`，确认对应目录可写。
 
-```bash
-cd backend
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+### 3) 图片无法访问
 
-### 3) `.venv/bin/pip bad interpreter`
+检查：
+
+- `PUBLIC_BASE_URL` 是否和后端实际访问地址一致
+- `backend/uploads/` 中是否已写入文件
+- 后端是否正常启动并挂载了 `/uploads/*` 静态目录
+
+### 4) `.venv/bin/pip bad interpreter`
 
 虚拟环境路径失效，重建：
 

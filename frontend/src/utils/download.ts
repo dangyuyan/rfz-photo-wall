@@ -24,7 +24,7 @@ export async function downloadPhotoToLocal(photo: Photo) {
   const response = await fetch(photo.image_url)
 
   if (!response.ok) {
-    throw new Error("下载图片失败，请稍后再试")
+    throw new Error("下载文件失败，请稍后再试")
   }
 
   const blob = await response.blob()

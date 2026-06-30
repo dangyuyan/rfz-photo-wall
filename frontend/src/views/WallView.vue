@@ -6,10 +6,16 @@ import PhotoPreviewModal from "../components/PhotoPreviewModal.vue"
 import { listPersons, listPhotos, removePhoto } from "../api/client"
 import type { Person, Photo } from "../types"
 import { downloadPhotoToLocal } from "../utils/download"
+import { buildMediaSummary } from "../utils/media"
 
 type PreviewPhoto = {
   title: string | null
   image_url: string
+  media_type: "image" | "video"
+  poster_url?: string | null
+  duration_seconds?: number | null
+  width?: number | null
+  height?: number | null
   shot_month?: string | null
   personNames?: string
 }
@@ -32,6 +38,20 @@ async function fetchPhotos() {
 
 function getPersonNames(photo: Photo) {
   return photo.persons.map((person) => person.name).join(" · ") || "未标记人物"
+}
+
+function getPreviewPhoto(photo: Photo): PreviewPhoto {
+  return {
+    title: photo.title,
+    image_url: photo.image_url,
+    media_type: photo.media_type,
+    poster_url: photo.poster_url,
+    duration_seconds: photo.duration_seconds,
+    width: photo.width,
+    height: photo.height,
+    shot_month: photo.shot_month,
+    personNames: getPersonNames(photo),
+  }
 }
 
 async function deletePhoto(photo: Photo) {
@@ -113,20 +133,28 @@ onMounted(() => {
         :key="photo.id"
         class="photo-wall-card"
         @click="
-          previewPhoto = {
-            title: photo.title,
-            image_url: photo.image_url,
-            shot_month: photo.shot_month,
-            personNames: getPersonNames(photo),
-          }
+          previewPhoto = getPreviewPhoto(photo)
         "
       >
-        <img :src="photo.image_url" :alt="photo.title || 'photo'" />
+        <img v-if="photo.media_type === 'image'" :src="photo.image_url" :alt="photo.title || 'photo'" />
+        <img
+          v-else-if="photo.poster_url"
+          :src="photo.poster_url"
+          :alt="photo.title || 'video poster'"
+        />
+        <video
+          v-else
+          :src="photo.image_url"
+          muted
+          playsinline
+          preload="metadata"
+        />
 
         <div class="photo-wall-overlay">
           <h3>{{ photo.title || "未命名照片" }}</h3>
           <p>{{ getPersonNames(photo) }}</p>
           <p>{{ photo.shot_month || "未填写时间" }}</p>
+          <p v-if="buildMediaSummary(photo)">{{ buildMediaSummary(photo) }}</p>
 
           <div class="card-actions" @click.stop>
             <button
