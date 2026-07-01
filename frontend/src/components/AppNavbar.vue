@@ -17,7 +17,15 @@ const currentPath = computed(() => route.path)
 <template>
   <header class="navbar">
     <div class="navbar-inner">
-      <RouterLink to="/timeline" class="brand">RFZ照片墙</RouterLink>
+      <RouterLink to="/timeline" class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+        <span>RFZ照片墙</span>
+      </RouterLink>
 
       <nav class="nav-links">
         <RouterLink

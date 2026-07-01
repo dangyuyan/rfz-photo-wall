@@ -115,6 +115,12 @@ export function createPerson(name: string) {
   })
 }
 
+export function removePerson(personId: number) {
+  return request<{ id: number }>(`/api/persons/${personId}`, {
+    method: "DELETE",
+  })
+}
+
 export function listPhotos(view: "timeline" | "wall") {
   return request<Photo[]>(`/api/photos?view=${view}`)
 }

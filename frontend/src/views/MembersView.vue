@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue"
 
-import { createPerson, listPersons } from "../api/client"
+import { createPerson, listPersons, removePerson } from "../api/client"
 import type { Person } from "../types"
 
 const persons = ref<Person[]>([])
 const name = ref("")
 const loading = ref(false)
+const deletingPersonId = ref<number | null>(null)
 
 async function fetchPersons() {
   persons.value = await listPersons()
@@ -35,6 +36,23 @@ async function addPerson() {
     alert(error instanceof Error ? error.message : "新增成员失败，请稍后再试")
   } finally {
     loading.value = false
+  }
+}
+
+async function deletePerson(person: Person) {
+  const confirmed = window.confirm(`确定删除成员「${person.name}」吗？照片不会被删除。`)
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    deletingPersonId.value = person.id
+    await removePerson(person.id)
+    await fetchPersons()
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "删除成员失败，请稍后再试")
+  } finally {
+    deletingPersonId.value = null
   }
 }
 
@@ -78,10 +96,17 @@ onMounted(() => {
       <div v-else class="member-grid">
         <div v-for="person in persons" :key="person.id" class="member-card">
           <div class="member-avatar">{{ person.name.slice(0, 1) }}</div>
-          <div>
+          <div class="member-info">
             <div class="member-name">{{ person.name }}</div>
             <div class="member-meta">RFZ 成员</div>
           </div>
+          <button
+            class="danger-outline-btn small-btn"
+            :disabled="deletingPersonId === person.id"
+            @click="deletePerson(person)"
+          >
+            {{ deletingPersonId === person.id ? "删除中" : "删除" }}
+          </button>
         </div>
       </div>
     </section>

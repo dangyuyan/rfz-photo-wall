@@ -8,6 +8,10 @@ class PersonAlreadyExistsError(ValueError):
     pass
 
 
+class PersonNotFoundError(ValueError):
+    pass
+
+
 def list_persons() -> list[Person]:
     with get_db() as connection:
         rows = connection.execute(
@@ -49,3 +53,10 @@ def create_person(name: str) -> Person:
         raise RuntimeError("新增成员失败")
 
     return Person.model_validate(dict(created_row))
+
+
+def delete_person(person_id: int) -> None:
+    with get_db() as connection:
+        cursor = connection.execute("DELETE FROM persons WHERE id = ?", (person_id,))
+        if cursor.rowcount == 0:
+            raise PersonNotFoundError("成员不存在")

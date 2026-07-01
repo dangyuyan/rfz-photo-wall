@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.schemas.common import ApiResponse
 from app.schemas.person import CreatePersonRequest, Person
-from app.services.persons import PersonAlreadyExistsError, create_person, list_persons
+from app.services.persons import (
+    PersonAlreadyExistsError,
+    PersonNotFoundError,
+    create_person,
+    delete_person,
+    list_persons,
+)
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
 
@@ -24,3 +30,13 @@ def post_person(payload: CreatePersonRequest) -> ApiResponse[Person]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
     return ApiResponse(data=person, message="成员创建成功")
+
+
+@router.delete("/{person_id}", response_model=ApiResponse[dict[str, int]])
+def remove_person(person_id: int) -> ApiResponse[dict[str, int]]:
+    try:
+        delete_person(person_id)
+    except PersonNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+    return ApiResponse(data={"id": person_id}, message="成员删除成功")
