@@ -77,7 +77,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, init)
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      ...init,
+    })
   } catch {
     throw new Error("无法连接到服务，请检查网络、接口地址或稍后重试。")
   }
@@ -101,6 +104,35 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (payload as ApiResponse<T>).data
 }
 
+function normalizeMediaUrl(url: string | null | undefined) {
+  if (!url) {
+    return null
+  }
+
+  if (url.startsWith("/uploads/")) {
+    return url
+  }
+
+  try {
+    const parsedUrl = new URL(url)
+    if (parsedUrl.pathname.startsWith("/uploads/")) {
+      return parsedUrl.pathname
+    }
+  } catch {
+    return url
+  }
+
+  return url
+}
+
+function normalizePhoto(photo: Photo): Photo {
+  return {
+    ...photo,
+    image_url: normalizeMediaUrl(photo.image_url) || photo.image_url,
+    poster_url: normalizeMediaUrl(photo.poster_url),
+  }
+}
+
 export function listPersons() {
   return request<Person[]>("/api/persons")
 }
@@ -122,7 +154,9 @@ export function removePerson(personId: number) {
 }
 
 export function listPhotos(view: "timeline" | "wall") {
-  return request<Photo[]>(`/api/photos?view=${view}`)
+  return request<Photo[]>(`/api/photos?view=${view}`).then((photos) =>
+    photos.map(normalizePhoto),
+  )
 }
 
 export function updatePhoto(photoId: number, payload: UpdatePhotoPayload) {
@@ -132,7 +166,7 @@ export function updatePhoto(photoId: number, payload: UpdatePhotoPayload) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
-  })
+  }).then(normalizePhoto)
 }
 
 export function removePhoto(photoId: number) {
@@ -155,5 +189,5 @@ export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
   return request<Photo[]>("/api/photos/upload", {
     method: "POST",
     body: formData,
-  })
+  }).then((photos) => photos.map(normalizePhoto))
 }

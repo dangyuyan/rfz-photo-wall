@@ -79,12 +79,20 @@ async function deletePhoto(photo: Photo) {
   try {
     deletingId.value = photo.id
     await removePhoto(photo.id)
+    photos.value = photos.value.filter((item) => item.id !== photo.id)
     await fetchPhotos()
   } catch (error) {
     alert(error instanceof Error ? error.message : "删除失败，请稍后再试")
   } finally {
     deletingId.value = null
   }
+}
+
+async function handlePhotoSaved(updatedPhoto: Photo) {
+  photos.value = photos.value.map((photo) =>
+    photo.id === updatedPhoto.id ? updatedPhoto : photo,
+  )
+  await fetchPhotos()
 }
 
 async function downloadPhoto(photo: Photo) {
@@ -290,15 +298,15 @@ onMounted(() => {
                       <button
                         class="secondary-btn"
                         :disabled="downloadingId === photo.id"
-                        @click="downloadPhoto(photo)"
+                        @click.stop="downloadPhoto(photo)"
                       >
                         {{ downloadingId === photo.id ? "下载中..." : "下载" }}
                       </button>
-                      <button class="secondary-btn" @click="editingPhoto = photo">编辑</button>
+                      <button class="secondary-btn" @click.stop="editingPhoto = photo">编辑</button>
                       <button
                         class="danger-btn"
                         :disabled="deletingId === photo.id"
-                        @click="deletePhoto(photo)"
+                        @click.stop="deletePhoto(photo)"
                       >
                         {{ deletingId === photo.id ? "删除中..." : "删除" }}
                       </button>
@@ -317,7 +325,7 @@ onMounted(() => {
       :photo="editingPhoto"
       :persons="persons"
       @close="editingPhoto = null"
-      @saved="fetchPhotos"
+      @saved="handlePhotoSaved"
     />
     <PhotoPreviewModal :photo="previewPhoto" @close="previewPhoto = null" />
   </div>

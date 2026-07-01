@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  saved: []
+  saved: [photo: Photo]
 }>()
 
 const title = ref("")
@@ -54,12 +54,12 @@ async function saveEdit() {
 
   try {
     saving.value = true
-    await updatePhoto(props.photo.id, {
+    const photo = await updatePhoto(props.photo.id, {
       title: title.value.trim() || null,
       shot_month: shotMonth.value || null,
       person_ids: selectedPersons.value,
     })
-    emit("saved")
+    emit("saved", photo)
     emit("close")
   } catch (error) {
     alert(error instanceof Error ? error.message : "保存失败，请稍后再试")

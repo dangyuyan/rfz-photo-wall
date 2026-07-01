@@ -699,6 +699,8 @@ button:disabled {
 }
 
 .photo-card-body {
+  position: relative;
+  z-index: 1;
   padding: 14px;
 }
 
@@ -720,10 +722,16 @@ button:disabled {
 }
 
 .card-actions {
+  position: relative;
+  z-index: 5;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 14px;
+}
+
+.card-actions button {
+  pointer-events: auto;
 }
 
 .year-title {
@@ -966,12 +974,14 @@ button:disabled {
 .photo-wall-overlay {
   position: absolute;
   inset: 0;
+  z-index: 3;
   color: #fffaf7;
   padding: 18px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   opacity: 0;
+  pointer-events: none;
   transition: 0.25s ease;
   background:
     linear-gradient(to top, rgba(55, 44, 42, 0.88), rgba(53, 79, 82, 0.34) 58%, transparent);
@@ -980,6 +990,7 @@ button:disabled {
 
 .photo-wall-card:hover .photo-wall-overlay {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .photo-wall-overlay h3 {
