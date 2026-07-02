@@ -71,6 +71,14 @@ textarea {
   font: inherit;
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 img {
   display: block;
 }
@@ -1714,9 +1722,103 @@ body::before {
   }
 }
 
+@media (hover: none), (pointer: coarse) {
+  .nav-link:hover,
+  .primary-btn:hover:not(:disabled),
+  .secondary-btn:hover:not(:disabled),
+  .ghost-btn:hover:not(:disabled),
+  .danger-btn:hover:not(:disabled),
+  .danger-outline-btn:hover:not(:disabled),
+  .filter-btn:hover:not(:disabled),
+  .member-card:hover,
+  .upload-card:hover,
+  .photo-card:hover,
+  .photo-wall-card:hover {
+    transform: none;
+  }
+
+  .photo-wall-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  .photo-wall-card {
+    height: auto;
+    min-height: 390px;
+    display: flex;
+    flex-direction: column;
+    cursor: default;
+  }
+
+  .photo-wall-card > img,
+  .photo-wall-card > video {
+    height: 260px;
+    flex: 0 0 auto;
+    opacity: 1;
+    filter: none;
+    cursor: zoom-in;
+  }
+
+  .photo-wall-card:hover img,
+  .photo-wall-card:hover video {
+    opacity: 1;
+    filter: none;
+  }
+
+  .photo-wall-overlay {
+    position: relative;
+    inset: auto;
+    z-index: 1;
+    opacity: 1;
+    pointer-events: auto;
+    min-height: 130px;
+    padding: 14px;
+    color: var(--text-main);
+    background:
+      linear-gradient(180deg, rgba(250, 247, 240, 0.94), rgba(238, 233, 222, 0.9)),
+      repeating-linear-gradient(0deg, rgba(62, 58, 50, 0.02) 0 1px, transparent 1px 8px);
+  }
+
+  .photo-wall-overlay h3,
+  .photo-wall-overlay p,
+  .photo-wall-overlay .card-actions {
+    opacity: 1;
+    transform: none;
+    color: inherit;
+  }
+
+  .photo-wall-overlay p {
+    color: var(--text-muted);
+  }
+
+  .card-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .card-actions .primary-btn,
+  .card-actions .secondary-btn,
+  .card-actions .ghost-btn,
+  .card-actions .danger-btn,
+  .card-actions .danger-outline-btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 8px;
+  }
+
+  .timeline-grid .card-actions,
+  .photo-card .card-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .clickable-image {
+    cursor: zoom-in;
+  }
+}
+
 @media (max-width: 768px) {
   .page-container {
-    padding: 18px 12px 54px;
+    padding: 14px 10px 48px;
   }
 
   .page-container::before {
@@ -1728,27 +1830,46 @@ body::before {
   .navbar-inner {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+    padding: 14px 12px;
   }
 
   .nav-links {
     width: 100%;
     overflow-x: auto;
     flex-wrap: nowrap;
-    padding-bottom: 4px;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-link {
     white-space: nowrap;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
   }
 
   .hero-card,
   .panel-card {
-    border-radius: 20px;
-    padding: 18px;
+    border-radius: 2px 18px 3px 14px;
+    padding: 18px 14px;
   }
 
   .hero-card h1 {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  .hero-card p {
+    line-height: 1.7;
+  }
+
+  .brand {
+    font-size: 20px;
   }
 
   .member-grid,
@@ -1799,23 +1920,27 @@ body::before {
   }
 
   .photo-wall-card {
-    height: 300px;
+    min-height: 390px;
   }
 
-  .photo-wall-overlay {
-    opacity: 1;
+  .photo-wall-card > img,
+  .photo-wall-card > video {
+    height: 245px;
   }
 
-  .photo-wall-overlay h3,
-  .photo-wall-overlay p,
-  .photo-wall-overlay .card-actions {
-    transform: translateY(0);
-    opacity: 1;
+  .upload-preview,
+  .photo-image {
+    height: 220px;
+  }
+
+  .photo-card-body {
+    padding: 12px;
   }
 
   .section-title-row,
   .inline-form,
-  .action-row {
+  .action-row,
+  .filter-row {
     align-items: stretch;
     flex-direction: column;
   }
@@ -1834,6 +1959,24 @@ body::before {
   .text-input {
     max-width: 100%;
     width: 100%;
+  }
+
+  input[type="file"] {
+    max-width: 100%;
+    min-height: 44px;
+  }
+
+  .checkbox-wrap {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .checkbox-tag {
+    min-height: 44px;
+  }
+
+  .member-card {
+    align-items: flex-start;
   }
 
   .modal-panel {

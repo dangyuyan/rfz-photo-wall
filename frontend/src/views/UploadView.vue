@@ -15,6 +15,18 @@ type PendingPhoto = {
   selectedPersons: number[]
 }
 
+const imageExtensions = new Set([
+  "avif",
+  "gif",
+  "heic",
+  "heif",
+  "jpeg",
+  "jpg",
+  "png",
+  "webp",
+])
+const videoExtensions = new Set(["m4v", "mov", "mp4", "webm"])
+
 const persons = ref<Person[]>([])
 const pendingPhotos = ref<PendingPhoto[]>([])
 const uploading = ref(false)
@@ -35,8 +47,14 @@ function getTotalFileSize(files: File[]) {
 }
 
 function getMediaType(file: File): MediaType | null {
-  if (file.type.startsWith("image/")) return "image"
-  if (file.type.startsWith("video/")) return "video"
+  const contentType = file.type.toLowerCase()
+  if (contentType.startsWith("image/")) return "image"
+  if (contentType.startsWith("video/")) return "video"
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || ""
+  if (imageExtensions.has(extension)) return "image"
+  if (videoExtensions.has(extension)) return "video"
+
   return null
 }
 
@@ -112,6 +130,10 @@ async function handleFilesChange(event: Event) {
     alert("请选择图片或视频文件")
     target.value = ""
     return
+  }
+
+  if (supportedFiles.length < files.length) {
+    uploadNotice.value = `已忽略 ${files.length - supportedFiles.length} 个不支持的文件，仅支持图片或视频。`
   }
 
   const newItems: PendingPhoto[] = []
@@ -220,20 +242,29 @@ async function handleBatchUpload() {
     return
   }
 
-  const files = pendingPhotos.value.map((item) => item.file)
+  const uploadQueue = [...pendingPhotos.value]
+  const totalCount = uploadQueue.length
 
   try {
     uploading.value = true
-    const items: UploadPhotoPayload[] = pendingPhotos.value.map((item) => ({
-      title: item.title.trim() || null,
-      shot_month: item.shotMonth || null,
-      person_ids: item.selectedPersons,
-    }))
 
-    await uploadPhotos(files, items)
+    for (const [index, item] of uploadQueue.entries()) {
+      uploadNotice.value = `正在上传 ${index + 1} / ${totalCount}：${item.file.name}`
+
+      const payload: UploadPhotoPayload = {
+        title: item.title.trim() || null,
+        shot_month: item.shotMonth || null,
+        person_ids: item.selectedPersons,
+      }
+
+      await uploadPhotos([item.file], [payload], (progress) => {
+        uploadNotice.value = `正在上传 ${index + 1} / ${totalCount}：${item.file.name} · ${progress.percent}% (${formatBytes(progress.loaded)} / ${formatBytes(progress.total)})`
+      })
+      removePendingPhoto(item.id)
+    }
+
     uploadNotice.value = ""
     alert("批量上传成功！")
-    clearAllPending()
   } catch (error) {
     const message =
       error instanceof Error
@@ -276,7 +307,7 @@ onBeforeUnmount(() => {
 
       <input
         type="file"
-        accept="image/*,video/*"
+        accept="image/*,video/*,.avif,.gif,.heic,.heif,.jpeg,.jpg,.m4v,.mov,.mp4,.png,.webm,.webp"
         multiple
         :disabled="uploading"
         @change="handleFilesChange"

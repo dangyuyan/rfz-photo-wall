@@ -21,7 +21,24 @@ function buildFileName(photo: Photo) {
 }
 
 export async function downloadPhotoToLocal(photo: Photo) {
-  const response = await fetch(photo.image_url)
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), 120_000)
+  let response: Response
+
+  try {
+    response = await fetch(photo.image_url, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("下载超时，请检查手机网络后重试")
+    }
+
+    throw new Error("无法连接到文件地址，请检查网络后重试")
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     throw new Error("下载文件失败，请稍后再试")

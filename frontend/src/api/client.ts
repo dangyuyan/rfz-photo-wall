@@ -6,9 +6,53 @@ import type {
   UploadPhotoPayload,
 } from "../types"
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ??
-  (import.meta.env.DEV ? "http://localhost:8000" : "")
+type RequestOptions = RequestInit & {
+  timeoutMs?: number
+}
+
+type UploadProgressCallback = (progress: {
+  loaded: number
+  total: number
+  percent: number
+}) => void
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
+
+function normalizeApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "")
+
+  if (!configuredBaseUrl) {
+    return import.meta.env.DEV ? "http://localhost:8000" : ""
+  }
+
+  if (typeof window === "undefined") {
+    return configuredBaseUrl
+  }
+
+  try {
+    const configuredUrl = new URL(configuredBaseUrl)
+    const currentHost = window.location.hostname
+    const configuredHost = configuredUrl.hostname
+
+    if (LOCAL_HOSTS.has(configuredHost) && !LOCAL_HOSTS.has(currentHost)) {
+      return ""
+    }
+
+    if (!import.meta.env.DEV && configuredHost === currentHost) {
+      return ""
+    }
+
+    if (configuredUrl.origin === window.location.origin) {
+      return ""
+    }
+  } catch {
+    return configuredBaseUrl
+  }
+
+  return configuredBaseUrl
+}
+
+const API_BASE_URL = normalizeApiBaseUrl()
 
 type ErrorDetailItem = {
   msg?: string
@@ -73,16 +117,26 @@ function extractErrorMessage(payload: unknown): string {
   return "请求失败，请稍后再试"
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   let response: Response
+  const { timeoutMs = 120_000, ...requestInit } = init || {}
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       cache: "no-store",
-      ...init,
+      ...requestInit,
+      signal: controller.signal,
     })
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("请求超时，请检查手机网络或服务器接口地址后重试。")
+    }
+
     throw new Error("无法连接到服务，请检查网络、接口地址或稍后重试。")
+  } finally {
+    window.clearTimeout(timeoutId)
   }
 
   const contentType = response.headers.get("content-type") || ""
@@ -133,6 +187,25 @@ function normalizePhoto(photo: Photo): Photo {
   }
 }
 
+function parseApiResponse<T>(responseText: string, status: number, contentType: string): T {
+  const isJson = contentType.includes("application/json")
+  const payload = isJson && responseText ? JSON.parse(responseText) : responseText
+
+  if (status < 200 || status >= 300) {
+    if (typeof payload === "string" && payload.trim()) {
+      throw new Error(extractTextErrorMessage(payload, status))
+    }
+
+    if (status === 413) {
+      throw new Error("上传内容过大，请减少单次上传数量或压缩后重试。")
+    }
+
+    throw new Error(extractErrorMessage(payload))
+  }
+
+  return (payload as ApiResponse<T>).data
+}
+
 export function listPersons() {
   return request<Person[]>("/api/persons")
 }
@@ -172,10 +245,15 @@ export function updatePhoto(photoId: number, payload: UpdatePhotoPayload) {
 export function removePhoto(photoId: number) {
   return request<{ id: number }>(`/api/photos/${photoId}`, {
     method: "DELETE",
+    timeoutMs: 30_000,
   })
 }
 
-export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
+export async function uploadPhotos(
+  files: File[],
+  items: UploadPhotoPayload[],
+  onProgress?: UploadProgressCallback,
+) {
   if (files.length !== items.length) {
     throw new Error("上传文件数量与元数据数量不一致。")
   }
@@ -186,8 +264,45 @@ export async function uploadPhotos(files: File[], items: UploadPhotoPayload[]) {
   }
   formData.append("payload", JSON.stringify({ items }))
 
-  return request<Photo[]>("/api/photos/upload", {
-    method: "POST",
-    body: formData,
-  }).then((photos) => photos.map(normalizePhoto))
+  return new Promise<Photo[]>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+
+    xhr.open("POST", `${API_BASE_URL}/api/photos/upload`)
+    xhr.timeout = 900_000
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        return
+      }
+
+      onProgress?.({
+        loaded: event.loaded,
+        total: event.total,
+        percent: Math.round((event.loaded / event.total) * 100),
+      })
+    }
+
+    xhr.onload = () => {
+      try {
+        const photos = parseApiResponse<Photo[]>(
+          xhr.responseText,
+          xhr.status,
+          xhr.getResponseHeader("content-type") || "",
+        )
+        resolve(photos.map(normalizePhoto))
+      } catch (error) {
+        reject(error)
+      }
+    }
+
+    xhr.onerror = () => {
+      reject(new Error("上传连接失败，请检查手机网络或服务器接口地址后重试。"))
+    }
+
+    xhr.ontimeout = () => {
+      reject(new Error("上传超时，请确认手机网络稳定，或尝试压缩图片后重试。"))
+    }
+
+    xhr.send(formData)
+  })
 }

@@ -55,10 +55,26 @@ def _extract_storage_path_from_public_url(image_url: str | None) -> str | None:
 
 
 def _media_type_from_content_type(content_type: str) -> str:
-    if content_type.startswith("image/"):
+    normalized_content_type = content_type.lower()
+    if normalized_content_type.startswith("image/"):
         return "image"
-    if content_type.startswith("video/"):
+    if normalized_content_type.startswith("video/"):
         return "video"
+    raise ValueError("仅支持图片或视频文件")
+
+
+def _media_type_from_upload(filename: str, content_type: str) -> str:
+    try:
+        return _media_type_from_content_type(content_type)
+    except ValueError:
+        pass
+
+    extension = Path(filename).suffix.lower().lstrip(".")
+    if extension in {"avif", "gif", "heic", "heif", "jpeg", "jpg", "png", "webp"}:
+        return "image"
+    if extension in {"m4v", "mov", "mp4", "webm"}:
+        return "video"
+
     raise ValueError("仅支持图片或视频文件")
 
 
@@ -212,7 +228,7 @@ def upload_photos(
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     for file, item in zip(files, payload.items, strict=True):
-        media_type = _media_type_from_content_type(file.content_type)
+        media_type = _media_type_from_upload(file.filename, file.content_type)
 
         if not file.content:
             raise ValueError(f"{file.filename} 文件内容为空")
