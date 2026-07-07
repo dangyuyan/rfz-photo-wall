@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 
 import EditPhotoModal from "../components/EditPhotoModal.vue"
 import PhotoPreviewModal from "../components/PhotoPreviewModal.vue"
 import { listPersons, listPhotos, removePhoto } from "../api/client"
+import { useAutoRefresh } from "../composables/useAutoRefresh"
 import type { Person, Photo } from "../types"
 import { downloadPhotoToLocal } from "../utils/download"
 import { buildMediaSummary } from "../utils/media"
@@ -45,6 +46,8 @@ const deletingId = ref<number | null>(null)
 const downloadingId = ref<number | null>(null)
 const previewPhoto = ref<PreviewPhoto | null>(null)
 const activeTimelinePointId = ref<string>("")
+const hasLoaded = ref(false)
+const refreshing = ref(false)
 
 async function fetchPersons() {
   persons.value = await listPersons()
@@ -191,10 +194,16 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
-  Promise.all([fetchPersons(), fetchPhotos()]).catch((error) => {
-    alert(error instanceof Error ? error.message : "获取照片失败，请稍后再试")
-  })
+useAutoRefresh(async () => {
+  refreshing.value = true
+  try {
+    await Promise.all([fetchPersons(), fetchPhotos()])
+    hasLoaded.value = true
+  } finally {
+    refreshing.value = false
+  }
+}, (error) => {
+  alert(error instanceof Error ? error.message : "获取照片失败，请稍后再试")
 })
 </script>
 
@@ -250,7 +259,11 @@ onMounted(() => {
       <div class="timeline-content">
         <h2>时间轴照片墙</h2>
 
-        <p v-if="groupedPhotos.length === 0" class="empty-text">暂无照片。</p>
+        <p v-if="!hasLoaded || refreshing && groupedPhotos.length === 0" class="empty-text">
+          正在加载照片...
+        </p>
+
+        <p v-else-if="groupedPhotos.length === 0" class="empty-text">暂无照片。</p>
 
         <div v-else>
           <div v-for="yearGroup in groupedPhotos" :key="yearGroup.year" class="year-block">
@@ -267,6 +280,8 @@ onMounted(() => {
                     :src="photo.image_url"
                     alt=""
                     class="photo-image clickable-image"
+                    loading="lazy"
+                    decoding="async"
                     @click="previewPhoto = getPreviewPhoto(photo)"
                   />
                   <img
@@ -274,6 +289,8 @@ onMounted(() => {
                     :src="photo.poster_url"
                     alt=""
                     class="photo-image clickable-image"
+                    loading="lazy"
+                    decoding="async"
                     @click="previewPhoto = getPreviewPhoto(photo)"
                   />
                   <video
@@ -282,7 +299,7 @@ onMounted(() => {
                     class="photo-image clickable-image"
                     muted
                     playsinline
-                    preload="metadata"
+                    preload="none"
                     @click="previewPhoto = getPreviewPhoto(photo)"
                   />
 

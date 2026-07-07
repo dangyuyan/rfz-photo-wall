@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue"
+import { computed, ref } from "vue"
 
 import EditPhotoModal from "../components/EditPhotoModal.vue"
 import PhotoPreviewModal from "../components/PhotoPreviewModal.vue"
 import { listPersons, listPhotos, removePhoto } from "../api/client"
+import { useAutoRefresh } from "../composables/useAutoRefresh"
 import type { Person, Photo } from "../types"
 import { downloadPhotoToLocal } from "../utils/download"
 import { buildMediaSummary } from "../utils/media"
@@ -27,6 +28,8 @@ const editingPhoto = ref<Photo | null>(null)
 const deletingId = ref<number | null>(null)
 const downloadingId = ref<number | null>(null)
 const previewPhoto = ref<PreviewPhoto | null>(null)
+const hasLoaded = ref(false)
+const refreshing = ref(false)
 
 async function fetchPersons() {
   persons.value = await listPersons()
@@ -96,10 +99,16 @@ const filteredPhotos = computed(() => {
   )
 })
 
-onMounted(() => {
-  Promise.all([fetchPersons(), fetchPhotos()]).catch((error) => {
-    alert(error instanceof Error ? error.message : "获取照片失败，请稍后再试")
-  })
+useAutoRefresh(async () => {
+  refreshing.value = true
+  try {
+    await Promise.all([fetchPersons(), fetchPhotos()])
+    hasLoaded.value = true
+  } finally {
+    refreshing.value = false
+  }
+}, (error) => {
+  alert(error instanceof Error ? error.message : "获取照片失败，请稍后再试")
 })
 </script>
 
@@ -131,7 +140,11 @@ onMounted(() => {
       </div>
     </section>
 
-    <section v-if="filteredPhotos.length === 0" class="panel-card">
+    <section v-if="!hasLoaded || refreshing && filteredPhotos.length === 0" class="panel-card">
+      <p class="empty-text">正在加载照片...</p>
+    </section>
+
+    <section v-else-if="filteredPhotos.length === 0" class="panel-card">
       <p class="empty-text">暂无照片。</p>
     </section>
 
@@ -144,18 +157,26 @@ onMounted(() => {
           previewPhoto = getPreviewPhoto(photo)
         "
       >
-        <img v-if="photo.media_type === 'image'" :src="photo.image_url" :alt="photo.title || 'photo'" />
+        <img
+          v-if="photo.media_type === 'image'"
+          :src="photo.image_url"
+          :alt="photo.title || 'photo'"
+          loading="lazy"
+          decoding="async"
+        />
         <img
           v-else-if="photo.poster_url"
           :src="photo.poster_url"
           :alt="photo.title || 'video poster'"
+          loading="lazy"
+          decoding="async"
         />
         <video
           v-else
           :src="photo.image_url"
           muted
           playsinline
-          preload="metadata"
+          preload="none"
         />
 
         <div class="photo-wall-overlay">

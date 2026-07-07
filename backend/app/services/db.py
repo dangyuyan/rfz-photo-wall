@@ -71,6 +71,18 @@ def init_database() -> None:
                 FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,
                 FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
             );
+
+            CREATE INDEX IF NOT EXISTS idx_photos_wall_order
+                ON photos(id DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_photos_timeline_order
+                ON photos(shot_month DESC, id DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_photo_persons_photo_id
+                ON photo_persons(photo_id);
+
+            CREATE INDEX IF NOT EXISTS idx_photo_persons_person_id
+                ON photo_persons(person_id);
             """
         )
 

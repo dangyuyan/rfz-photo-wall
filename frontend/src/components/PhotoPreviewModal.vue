@@ -35,14 +35,13 @@ const mediaSummary = computed(() => {
 
 <template>
   <div v-if="props.photo" class="preview-mask" @click="emit('close')">
-    <div class="preview-panel" @click.stop>
-      <button class="preview-close" @click="emit('close')">×</button>
-
+    <div class="preview-panel">
       <img
         v-if="props.photo.media_type === 'image'"
         :src="props.photo.image_url"
         :alt="props.photo.title || '大图预览'"
         class="preview-image"
+        @click.stop
       />
       <video
         v-else
@@ -52,9 +51,10 @@ const mediaSummary = computed(() => {
         controls
         playsinline
         preload="metadata"
+        @click.stop
       />
 
-      <div class="preview-info">
+      <div class="preview-info" @click.stop>
         <h3>{{ props.photo.title || "未命名照片" }}</h3>
         <p>{{ props.photo.personNames || "未标记人物" }}</p>
         <p>{{ props.photo.shot_month || "未填写时间" }}</p>

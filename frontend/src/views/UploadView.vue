@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import exifr from "exifr"
-import { computed, onBeforeUnmount, onMounted, ref } from "vue"
+import { computed, onBeforeUnmount, ref } from "vue"
 
 import { listPersons, uploadPhotos } from "../api/client"
+import { useAutoRefresh } from "../composables/useAutoRefresh"
 import type { MediaType, Person, UploadPhotoPayload } from "../types"
 
 type PendingPhoto = {
@@ -281,10 +282,12 @@ const defaultPersonNames = computed(() =>
   getSelectedPersonNames(defaultSelectedPersons.value),
 )
 
-onMounted(() => {
-  fetchPersons().catch((error) => {
-    alert(error instanceof Error ? error.message : "获取成员失败，请稍后再试")
-  })
+useAutoRefresh(async () => {
+  if (!uploading.value) {
+    await fetchPersons()
+  }
+}, (error) => {
+  alert(error instanceof Error ? error.message : "获取成员失败，请稍后再试")
 })
 
 onBeforeUnmount(() => {

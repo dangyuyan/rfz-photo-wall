@@ -18,11 +18,21 @@ type UploadProgressCallback = (progress: {
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
 
+function getLocalApiBaseUrl() {
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8000"
+  }
+
+  const { hostname, protocol } = window.location
+  const localHostname = LOCAL_HOSTS.has(hostname) ? hostname : "127.0.0.1"
+  return `${protocol}//${localHostname}:8000`
+}
+
 function normalizeApiBaseUrl() {
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "")
 
   if (!configuredBaseUrl) {
-    return import.meta.env.DEV ? "http://localhost:8000" : ""
+    return import.meta.env.DEV ? getLocalApiBaseUrl() : ""
   }
 
   if (typeof window === "undefined") {
@@ -33,6 +43,11 @@ function normalizeApiBaseUrl() {
     const configuredUrl = new URL(configuredBaseUrl)
     const currentHost = window.location.hostname
     const configuredHost = configuredUrl.hostname
+
+    if (LOCAL_HOSTS.has(configuredHost) && LOCAL_HOSTS.has(currentHost)) {
+      configuredUrl.hostname = currentHost
+      return configuredUrl.origin
+    }
 
     if (LOCAL_HOSTS.has(configuredHost) && !LOCAL_HOSTS.has(currentHost)) {
       return ""
@@ -120,11 +135,16 @@ function extractErrorMessage(payload: unknown): string {
 async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   let response: Response
   const { timeoutMs = 120_000, ...requestInit } = init || {}
+  const method = (requestInit.method || "GET").toUpperCase()
+  const requestPath =
+    method === "GET"
+      ? `${path}${path.includes("?") ? "&" : "?"}_=${Date.now()}`
+      : path
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${API_BASE_URL}${requestPath}`, {
       cache: "no-store",
       ...requestInit,
       signal: controller.signal,

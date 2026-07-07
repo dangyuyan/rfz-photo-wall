@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { ref } from "vue"
 
 import { createPerson, listPersons, removePerson } from "../api/client"
+import { useAutoRefresh } from "../composables/useAutoRefresh"
 import type { Person } from "../types"
 
 const persons = ref<Person[]>([])
 const name = ref("")
 const loading = ref(false)
 const deletingPersonId = ref<number | null>(null)
+const hasLoaded = ref(false)
+const refreshing = ref(false)
 
 async function fetchPersons() {
   persons.value = await listPersons()
@@ -56,10 +59,16 @@ async function deletePerson(person: Person) {
   }
 }
 
-onMounted(() => {
-  fetchPersons().catch((error) => {
-    alert(error instanceof Error ? error.message : "获取成员失败，请稍后再试")
-  })
+useAutoRefresh(async () => {
+  refreshing.value = true
+  try {
+    await fetchPersons()
+    hasLoaded.value = true
+  } finally {
+    refreshing.value = false
+  }
+}, (error) => {
+  alert(error instanceof Error ? error.message : "获取成员失败，请稍后再试")
 })
 </script>
 
@@ -91,7 +100,11 @@ onMounted(() => {
         <span class="badge">{{ persons.length }} 人</span>
       </div>
 
-      <p v-if="persons.length === 0" class="empty-text">暂无成员。</p>
+      <p v-if="!hasLoaded || refreshing && persons.length === 0" class="empty-text">
+        正在加载成员...
+      </p>
+
+      <p v-else-if="persons.length === 0" class="empty-text">暂无成员。</p>
 
       <div v-else class="member-grid">
         <div v-for="person in persons" :key="person.id" class="member-card">

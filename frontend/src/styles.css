@@ -1131,22 +1131,6 @@ button:disabled {
   color: rgba(255, 245, 240, 0.86);
 }
 
-.preview-close {
-  position: absolute;
-  top: -14px;
-  right: -14px;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 999px;
-  background: #fff5ef;
-  color: var(--text-strong);
-  font-size: 24px;
-  cursor: pointer;
-  z-index: 2;
-  box-shadow: 0 12px 26px rgba(25, 14, 11, 0.24);
-}
-
 .clickable-image {
   cursor: zoom-in;
 }
@@ -1237,6 +1221,12 @@ body::before {
 
 .page-stack > * {
   animation: fadeUp 0.26s ease both;
+}
+
+.photo-card,
+.photo-wall-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 360px 420px;
 }
 
 .navbar {
@@ -1682,11 +1672,6 @@ body::before {
   box-shadow: none;
 }
 
-.preview-close {
-  background: #eee9de;
-  box-shadow: none;
-}
-
 @keyframes modalIn {
   from {
     opacity: 0;
@@ -1976,7 +1961,25 @@ body::before {
   }
 
   .member-card {
-    align-items: flex-start;
+    align-items: center;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .member-card .member-avatar {
+    height: 44px;
+    width: 44px;
+  }
+
+  .member-card .member-info {
+    min-width: 0;
+  }
+
+  .member-card .danger-outline-btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100%;
   }
 
   .modal-panel {
@@ -1993,8 +1996,4 @@ body::before {
     border-radius: 12px;
   }
 
-  .preview-close {
-    top: 8px;
-    right: 8px;
-  }
 }
