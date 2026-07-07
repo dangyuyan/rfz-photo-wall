@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from "vue"
 
 import EditPhotoModal from "../components/EditPhotoModal.vue"
+import PersonMultiSelect from "../components/PersonMultiSelect.vue"
 import PhotoPreviewModal from "../components/PhotoPreviewModal.vue"
 import { listPersons, listPhotos, removePhoto } from "../api/client"
 import { useAutoRefresh } from "../composables/useAutoRefresh"
@@ -40,7 +41,7 @@ type TimelinePoint = {
 
 const persons = ref<Person[]>([])
 const photos = ref<Photo[]>([])
-const activePersonId = ref<number | null>(null)
+const selectedPersonIds = ref<number[]>([])
 const editingPhoto = ref<Photo | null>(null)
 const deletingId = ref<number | null>(null)
 const downloadingId = ref<number | null>(null)
@@ -110,10 +111,10 @@ async function downloadPhoto(photo: Photo) {
 }
 
 const filteredPhotos = computed(() => {
-  if (!activePersonId.value) return photos.value
+  if (selectedPersonIds.value.length === 0) return photos.value
 
   return photos.value.filter((photo) =>
-    photo.persons.some((person) => person.id === activePersonId.value),
+    photo.persons.some((person) => selectedPersonIds.value.includes(person.id)),
   )
 })
 
@@ -214,25 +215,12 @@ useAutoRefresh(async () => {
       <p>按年份和月份回看高中毕业以来的共同回忆。</p>
     </section>
 
-    <section class="panel-card">
+    <section class="panel-card filter-panel">
       <h2>按成员筛选</h2>
-      <div class="filter-row">
-        <button
-          :class="activePersonId === null ? 'filter-btn active' : 'filter-btn'"
-          @click="activePersonId = null"
-        >
-          全部
-        </button>
-
-        <button
-          v-for="person in persons"
-          :key="person.id"
-          :class="activePersonId === person.id ? 'filter-btn active' : 'filter-btn'"
-          @click="activePersonId = activePersonId === person.id ? null : person.id"
-        >
-          {{ person.name }}
-        </button>
-      </div>
+      <PersonMultiSelect
+        v-model:selected-person-ids="selectedPersonIds"
+        :persons="persons"
+      />
     </section>
 
     <section class="panel-card timeline-layout">

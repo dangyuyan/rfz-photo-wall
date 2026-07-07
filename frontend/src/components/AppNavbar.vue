@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from "vue-router"
 const route = useRoute()
 
 const navItems = [
+  { href: "/cover", label: "首页" },
   { href: "/members", label: "成员管理" },
   { href: "/upload", label: "上传文件" },
   { href: "/timeline", label: "时间轴" },
@@ -17,7 +18,7 @@ const currentPath = computed(() => route.path)
 <template>
   <header class="navbar">
     <div class="navbar-inner">
-      <RouterLink to="/timeline" class="brand">
+      <RouterLink to="/cover" class="brand">
         <span class="brand-mark" aria-hidden="true">
           <span />
           <span />
