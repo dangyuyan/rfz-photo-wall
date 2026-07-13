@@ -23,6 +23,10 @@ const videoCount = computed(
   () => photos.value.filter((photo) => photo.media_type === "video").length,
 )
 
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value)
+}
+
 function resetCarouselTimer() {
   if (carouselTimer !== null) {
     window.clearInterval(carouselTimer)
@@ -132,9 +136,9 @@ onBeforeUnmount(() => {
         <i class="star star-four" />
       </div>
       <div class="cover-petal-layer" aria-hidden="true">
-        <img class="cover-petal cover-petal-left" :src="magnoliaPetals" alt="" />
-        <img class="cover-petal cover-petal-bottom" :src="magnoliaPetals" alt="" />
-        <img class="cover-petal cover-petal-right" :src="magnoliaPetals" alt="" />
+        <span v-for="petal in 14" :key="petal" :class="`cover-petal petal-${petal}`">
+          <img :src="magnoliaPetals" alt="" />
+        </span>
       </div>
       <div class="cover-copy">
         <h1>Enjoy your<br />memories here</h1>
@@ -145,22 +149,22 @@ onBeforeUnmount(() => {
         <div class="cover-stats">
           <article class="cover-stat-card">
             <span class="cover-stat-icon" aria-hidden="true">⌑</span>
-            <strong>{{ photos.length }}</strong>
+            <strong>{{ formatCount(photos.length) }}</strong>
             <span class="cover-stat-label">全部</span>
           </article>
           <article class="cover-stat-card">
             <span class="cover-stat-icon" aria-hidden="true">▧</span>
-            <strong>{{ imageCount }}</strong>
+            <strong>{{ formatCount(imageCount) }}</strong>
             <span class="cover-stat-label">图片</span>
           </article>
           <article class="cover-stat-card">
             <span class="cover-stat-icon" aria-hidden="true">▷</span>
-            <strong>{{ videoCount }}</strong>
+            <strong>{{ formatCount(videoCount) }}</strong>
             <span class="cover-stat-label">视频</span>
           </article>
           <article class="cover-stat-card">
             <span class="cover-stat-icon" aria-hidden="true">♧</span>
-            <strong>{{ persons.length }}</strong>
+            <strong>{{ formatCount(persons.length) }}</strong>
             <span class="cover-stat-label">成员</span>
           </article>
         </div>

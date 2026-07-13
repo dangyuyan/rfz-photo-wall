@@ -41,7 +41,11 @@ onBeforeUnmount(resetDepth)
     <img class="global-petal global-petal-three" :src="magnoliaPetals" alt="" />
   </div>
   <AppNavbar />
-  <main class="page-container" @pointermove="updateDepth" @pointerleave="resetDepth">
+  <main
+    :class="route.path === '/cover' ? 'page-container cover-page-container' : 'page-container inner-page-container'"
+    @pointermove="updateDepth"
+    @pointerleave="resetDepth"
+  >
     <RouterView :key="route.fullPath" />
   </main>
 </template>
