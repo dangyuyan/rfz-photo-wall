@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { RouterLink } from "vue-router"
 
 import { listPersons, listPhotos } from "../api/client"
+import magnoliaPetals from "../assets/magnolia-petals-v1.png"
 import type { Person, Photo } from "../types"
 
 const photos = ref<Photo[]>([])
@@ -124,35 +125,43 @@ onBeforeUnmount(() => {
 <template>
   <div class="page-stack">
     <section class="cover-hero">
+      <div class="cover-starlight" aria-hidden="true">
+        <i class="star star-one" />
+        <i class="star star-two" />
+        <i class="star star-three" />
+        <i class="star star-four" />
+      </div>
+      <div class="cover-petal-layer" aria-hidden="true">
+        <img class="cover-petal cover-petal-left" :src="magnoliaPetals" alt="" />
+        <img class="cover-petal cover-petal-bottom" :src="magnoliaPetals" alt="" />
+        <img class="cover-petal cover-petal-right" :src="magnoliaPetals" alt="" />
+      </div>
       <div class="cover-copy">
-        <span class="cover-kicker">RFZ Reunion Memory Wall</span>
-        <h1>Wellcome to this Photo Wall! Enjoy your memories here.</h1>
+        <h1>Enjoy your<br />memories here</h1>
         <p>
           还有回忆记得
         </p>
 
-        <div class="cover-actions">
-          <RouterLink class="primary-btn" to="/timeline">时间轴</RouterLink>
-          <RouterLink class="secondary-btn" to="/wall">照片墙</RouterLink>
-          <RouterLink class="ghost-btn" to="/upload">上传</RouterLink>
-        </div>
-
         <div class="cover-stats">
           <article class="cover-stat-card">
-            <span class="cover-stat-label">全部媒体</span>
+            <span class="cover-stat-icon" aria-hidden="true">⌑</span>
             <strong>{{ photos.length }}</strong>
+            <span class="cover-stat-label">全部</span>
           </article>
           <article class="cover-stat-card">
-            <span class="cover-stat-label">图片</span>
+            <span class="cover-stat-icon" aria-hidden="true">▧</span>
             <strong>{{ imageCount }}</strong>
+            <span class="cover-stat-label">图片</span>
           </article>
           <article class="cover-stat-card">
-            <span class="cover-stat-label">视频</span>
+            <span class="cover-stat-icon" aria-hidden="true">▷</span>
             <strong>{{ videoCount }}</strong>
+            <span class="cover-stat-label">视频</span>
           </article>
           <article class="cover-stat-card">
-            <span class="cover-stat-label">成员</span>
+            <span class="cover-stat-icon" aria-hidden="true">♧</span>
             <strong>{{ persons.length }}</strong>
+            <span class="cover-stat-label">成员</span>
           </article>
         </div>
       </div>
@@ -241,6 +250,13 @@ onBeforeUnmount(() => {
             />
           </div>
         </template>
+      </div>
+
+      <div class="cover-category-bar" aria-label="媒体分类">
+        <span class="active">全部</span>
+        <span>图片</span>
+        <span>视频</span>
+        <span>成员</span>
       </div>
     </section>
   </div>

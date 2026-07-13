@@ -248,7 +248,9 @@ export function removePerson(personId: number) {
 
 export function listPhotos(view: "timeline" | "wall") {
   return request<Photo[]>(`/api/photos?view=${view}`).then((photos) =>
-    photos.map(normalizePhoto),
+    Array.from(
+      new Map(photos.map((photo) => [photo.id, normalizePhoto(photo)])).values(),
+    ),
   )
 }
 

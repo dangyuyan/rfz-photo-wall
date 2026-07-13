@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { RouterLink, useRoute } from "vue-router"
 
 const route = useRoute()
@@ -13,6 +13,12 @@ const navItems = [
 ]
 
 const currentPath = computed(() => route.path)
+const nightMode = ref(false)
+
+function toggleTheme() {
+  nightMode.value = !nightMode.value
+  document.documentElement.classList.toggle("night-mode", nightMode.value)
+}
 </script>
 
 <template>
@@ -38,6 +44,23 @@ const currentPath = computed(() => route.path)
           {{ item.label }}
         </RouterLink>
       </nav>
+
+      <div class="nav-actions" aria-label="快捷操作">
+        <button type="button" class="nav-icon-btn" aria-label="搜索">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+        </button>
+        <button
+          type="button"
+          class="nav-icon-btn"
+          :aria-label="nightMode ? '切换浅色主题' : '切换深色主题'"
+          @click="toggleTheme"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.4A8.6 8.6 0 1 1 8.6 4 6.8 6.8 0 0 0 20 15.4Z" /></svg>
+        </button>
+        <button type="button" class="nav-icon-btn" aria-label="用户中心">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20c.8-3.5 3-5.2 6.5-5.2s5.7 1.7 6.5 5.2" /></svg>
+        </button>
+      </div>
     </div>
   </header>
 </template>
