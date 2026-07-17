@@ -1,0 +1,40 @@
+frontend/index.html
+  s_2a6161486adaeb::t_ab669b8665ac86 6-8
+frontend/src/App.vue
+  s_8afe1a93164861::t_f3e05b5acb7157 11-12,19-26,29-30,32-98,102,115,118-125,235-238
+frontend/src/utils/media.ts
+  s_2a6161486adaeb::t_b4536a8ed22b3c 1-23
+frontend/tsconfig.tsbuildinfo
+  s_8afe1a93164861::t_14754541da71f0 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7e08d7bd61f0465fb4d627816faaf782948b7865",
+  "prompts": {},
+  "humans": {
+    "h_561e4fa3c595ac": {
+      "author": "dangyuyan <dangyuyan@bytedance.com>"
+    }
+  },
+  "sessions": {
+    "s_2a6161486adaeb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f64e8-b4f6-72d2-a9b8-2ff1f896945e",
+        "model": "unknown"
+      },
+      "human_author": "dangyuyan <dangyuyan@bytedance.com>"
+    },
+    "s_8afe1a93164861": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6f1c-af01-7e03-a59f-435536762c3a",
+        "model": "unknown"
+      },
+      "human_author": "dangyuyan <dangyuyan@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
