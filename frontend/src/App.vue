@@ -8,27 +8,98 @@ const route = useRoute()
 
 const depthX = ref(0)
 const depthY = ref(0)
+const targetDepth = { x: 0, y: 0 }
+let depthAnimationFrame: number | null = null
 
 const isCoverPage = computed(() => route.path === "/cover")
 
 const ambientStyle = computed(() => ({
   "--depth-x": `${depthX.value}px`,
   "--depth-y": `${depthY.value}px`,
+  "--depth-foreground-x": `${depthX.value * -1.65}px`,
+  "--depth-foreground-y": `${depthY.value * -1.65}px`,
+  "--depth-midground-x": `${depthX.value * -0.95}px`,
+  "--depth-midground-y": `${depthY.value * -0.95}px`,
+  "--depth-background-x": `${depthX.value * -0.35}px`,
+  "--depth-background-y": `${depthY.value * -0.35}px`,
+  "--depth-bokeh-x": `${depthX.value * -1.25}px`,
+  "--depth-bokeh-y": `${depthY.value * -1.25}px`,
 }))
 
-function updateDepth(event: PointerEvent) {
-  const target = event.currentTarget as HTMLElement
-  const bounds = target.getBoundingClientRect()
-  const x = (event.clientX - bounds.left) / bounds.width - 0.5
-  const y = (event.clientY - bounds.top) / bounds.height - 0.5
+let deviceDepthEnabled = false
+let lastOrientationUpdate = 0
 
-  depthX.value = x * 14
-  depthY.value = y * 10
+function setDepthTarget(x: number, y: number) {
+  targetDepth.x = Math.max(-28, Math.min(28, x))
+  targetDepth.y = Math.max(-22, Math.min(22, y))
+
+  if (depthAnimationFrame !== null) return
+
+  const animateDepth = () => {
+    depthX.value += (targetDepth.x - depthX.value) * 0.12
+    depthY.value += (targetDepth.y - depthY.value) * 0.12
+
+    if (Math.abs(targetDepth.x - depthX.value) < 0.05 && Math.abs(targetDepth.y - depthY.value) < 0.05) {
+      depthX.value = targetDepth.x
+      depthY.value = targetDepth.y
+      depthAnimationFrame = null
+      return
+    }
+
+    depthAnimationFrame = window.requestAnimationFrame(animateDepth)
+  }
+
+  depthAnimationFrame = window.requestAnimationFrame(animateDepth)
+}
+
+function updateDeviceDepth(event: DeviceOrientationEvent) {
+  if (event.gamma === null || event.beta === null) return
+
+  lastOrientationUpdate = Date.now()
+  setDepthTarget(event.gamma / 45 * 28, (event.beta - 45) / 45 * 22)
+}
+
+function updateMotionDepth(event: DeviceMotionEvent) {
+  if (Date.now() - lastOrientationUpdate < 300) return
+
+  const gravity = event.accelerationIncludingGravity
+  if (typeof gravity?.x !== "number" || typeof gravity.y !== "number") return
+
+  setDepthTarget(gravity.x / 9.81 * 28, gravity.y / 9.81 * 22)
+}
+
+function enableDeviceDepth() {
+  if (deviceDepthEnabled || typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return
+
+  const orientationEvent = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+    requestPermission?: () => Promise<"granted" | "denied">
+  }
+
+  if (orientationEvent.requestPermission) {
+    void orientationEvent.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        window.addEventListener("deviceorientation", updateDeviceDepth)
+        window.addEventListener("devicemotion", updateMotionDepth)
+        deviceDepthEnabled = true
+      }
+    }).catch(() => undefined)
+    return
+  }
+
+  window.addEventListener("deviceorientation", updateDeviceDepth)
+  window.addEventListener("devicemotion", updateMotionDepth)
+  deviceDepthEnabled = true
+}
+
+function updateDepth(event: MouseEvent) {
+  const x = event.clientX / window.innerWidth - 0.5
+  const y = event.clientY / window.innerHeight - 0.5
+
+  setDepthTarget(x * 28, y * 22)
 }
 
 function resetDepth() {
-  depthX.value = 0
-  depthY.value = 0
+  setDepthTarget(0, 0)
 }
 
 watch(
@@ -41,9 +112,17 @@ watch(
 
 onMounted(() => {
   document.documentElement.classList.toggle("cover-mode", isCoverPage.value)
+  enableDeviceDepth()
 })
 
-onBeforeUnmount(resetDepth)
+onBeforeUnmount(() => {
+  window.removeEventListener("deviceorientation", updateDeviceDepth)
+  window.removeEventListener("devicemotion", updateMotionDepth)
+  if (depthAnimationFrame !== null) window.cancelAnimationFrame(depthAnimationFrame)
+  depthAnimationFrame = null
+  depthX.value = 0
+  depthY.value = 0
+})
 
 const globalPetals = [
   { id: 1, size: 260, left: "-6%", top: "12%", rotate: -15, opacity: 0.32, blur: 0.6 },
@@ -153,8 +232,10 @@ const globalStars = Array.from({ length: 22 }, (_, index) => {
   <AppNavbar />
   <main
     :class="route.path === '/cover' ? 'page-container cover-page-container' : 'page-container inner-page-container'"
-    @pointermove="updateDepth"
-    @pointerleave="resetDepth"
+    :style="ambientStyle"
+    @mousemove="updateDepth"
+    @mouseleave="resetDepth"
+    @pointerdown="enableDeviceDepth"
   >
     <RouterView :key="route.fullPath" />
   </main>

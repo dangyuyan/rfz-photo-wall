@@ -10,10 +10,6 @@ export type Photo = {
   title: string | null
   image_url: string
   media_type: MediaType
-  poster_url: string | null
-  duration_seconds: number | null
-  width: number | null
-  height: number | null
   shot_month: string | null
   persons: Person[]
 }

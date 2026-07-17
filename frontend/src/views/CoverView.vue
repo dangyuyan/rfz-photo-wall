@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 
 import { listPersons, listPhotos } from "../api/client"
 import type { Person, Photo } from "../types"
+import magnoliaCornerUrl from "../assets/magnolia-corner-branch-v2.png"
+import magnoliaPetalUrl from "../assets/magnolia-petal-drift-v2.png"
 
 const photos = ref<Photo[]>([])
 const persons = ref<Person[]>([])
@@ -19,6 +21,15 @@ const imageCount = computed(
 const videoCount = computed(
   () => photos.value.filter((photo) => photo.media_type === "video").length,
 )
+
+const foregroundPetals = new Set([1, 6, 15])
+const midgroundPetals = new Set([2, 4, 5, 7, 8, 12, 14, 17])
+
+function petalDepthLayer(index: number) {
+  if (foregroundPetals.has(index)) return "depth-foreground"
+  if (midgroundPetals.has(index)) return "depth-midground"
+  return "depth-background"
+}
 
 type PetalShape = {
   outline: string
@@ -245,7 +256,7 @@ onBeforeUnmount(() => {
         <svg
           v-for="idx in 20"
           :key="idx"
-          :class="`cover-petal petal-${idx}`"
+          :class="['cover-petal', `petal-${idx}`, petalDepthLayer(idx)]"
           viewBox="0 0 200 320"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -340,17 +351,65 @@ onBeforeUnmount(() => {
             :r="sp.r"
             fill="rgba(255,230,190,0.9)"
           >
-            <animate
-              attributeName="opacity"
-              :values="si === 0 ? '0.4;1;0.4' : '0.2;0.7;0.2'"
-              :dur="si === 0 ? '3s' : `${3.5 + si * 0.5}s`"
-              :begin="`${si * 0.5 + (idx % 4) * 0.3}s`"
-              repeatCount="indefinite"
-            />
           </circle>
         </svg>
       </div>
+
+      <svg class="magnolia-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="magnolia-petal-fill" x1="250" y1="18" x2="250" y2="256" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#fffaf0" />
+            <stop offset=".42" stop-color="#f8dfca" />
+            <stop offset=".78" stop-color="#e5b890" />
+            <stop offset="1" stop-color="#a9735d" />
+          </linearGradient>
+          <linearGradient id="magnolia-petal-line" x1="210" y1="18" x2="294" y2="258" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#fffdf6" />
+            <stop offset=".55" stop-color="#f0cda9" />
+            <stop offset="1" stop-color="#c58d70" />
+          </linearGradient>
+          <filter id="magnolia-glass" x="-25%" y="-25%" width="150%" height="150%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur" />
+            <feSpecularLighting in="blur" surfaceScale="3" specularConstant=".55" specularExponent="20" lighting-color="#fff8e9" result="shine">
+              <fePointLight x="190" y="60" z="150" />
+            </feSpecularLighting>
+            <feComposite in="shine" in2="SourceAlpha" operator="in" result="lit" />
+            <feMerge><feMergeNode in="SourceGraphic" /><feMergeNode in="lit" /></feMerge>
+          </filter>
+          <path id="magnolia-petal" d="M250 258 C220 216 195 145 207 84 C214 45 235 19 250 16 C269 22 290 47 296 85 C306 145 280 216 250 258Z" fill="url(#magnolia-petal-fill)" stroke="url(#magnolia-petal-line)" stroke-width="2" />
+          <symbol id="magnolia-bloom" viewBox="0 0 500 500">
+            <g filter="url(#magnolia-glass)">
+              <use href="#magnolia-petal" transform="rotate(-62 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(-36 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(-12 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(14 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(40 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(66 250 258)" />
+              <use href="#magnolia-petal" transform="rotate(180 250 258)" opacity=".88" />
+              <ellipse cx="250" cy="256" rx="32" ry="23" fill="#d89c69" opacity=".86" />
+              <ellipse cx="250" cy="250" rx="14" ry="10" fill="#fff1c8" opacity=".92" />
+            </g>
+          </symbol>
+        </defs>
+      </svg>
+      <div class="drifting-petal-layer" aria-hidden="true">
+        <img v-for="petal in 12" :key="petal" :src="magnoliaPetalUrl" :class="`drifting-petal drift-${petal}`" alt="" />
+      </div>
+
+      <!-- Depth system: star field, bokeh, and layered glow. -->
+      <div class="cover-depth" aria-hidden="true">
+        <div class="cover-nebula" />
+        <i v-for="star in 38" :key="`reference-star-${star}`" class="reference-star" :class="{ big: star % 9 === 0 }" :style="{ left: `${(star * 37) % 96}%`, top: `${(star * 53) % 88}%`, width: `${star % 9 === 0 ? 4 : 1 + (star % 3)}px`, height: `${star % 9 === 0 ? 4 : 1 + (star % 3)}px`, '--tk': `${3 + (star % 6)}s`, '--td': `${-(star % 8)}s` }" />
+        <i class="reference-shooter" /><i class="reference-shooter shooter-b" /><i class="reference-shooter shooter-c" />
+        <i class="reference-glow champ" /><i class="reference-glow plum" /><i class="reference-glow sage" /><i class="reference-glow ivory" />
+        <i class="reference-bokeh bokeh-a" /><i class="reference-bokeh bokeh-b" /><i class="reference-bokeh bokeh-c" /><i class="reference-bokeh bokeh-d" />
+      </div>
       <div class="cover-copy">
+        <div class="corner-magnolia-layer" aria-hidden="true">
+          <img :src="magnoliaCornerUrl" class="corner-magnolia magnolia-far" alt="" />
+          <img :src="magnoliaCornerUrl" class="corner-magnolia magnolia-mid" alt="" />
+          <img :src="magnoliaCornerUrl" class="corner-magnolia magnolia-near" alt="" />
+        </div>
         <h1>Enjoy your<br />memories here</h1>
         <div class="cover-divider" aria-hidden="true">
           <span class="cover-divider-star">+</span>
